@@ -10,6 +10,7 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 import io
 import os
+import base64
 
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="ERP de Arquitectura y Dirección de Obra", layout="wide")
@@ -57,7 +58,13 @@ def generar_informe_pdf(datos_obra, df_cronograma, df_incidencias, df_docs, df_h
         for _, r_h in df_honorarios.iterrows():
             data_hon.append([r_h["fase"][:25], f"{r_h['porcentaje']}%", f"{r_h['base_imponible']:,.2f} €", f"{r_h['total_a_cobrar']:,.2f} €", r_h["estado"]])
         t_hon = Table(data_hon, colWidths=[170, 45, 95, 105, 75])
-        t_hon.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#E2E8F0")), ('GRID', (0, 0), (-1, -1), 0.5, colors.grey), ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), ('FONTSIZE', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 4)]))
+        t_hon.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#E2E8F0")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4)
+        ]))
         story.append(t_hon)
         story.append(Spacer(1, 10))
 
@@ -67,7 +74,13 @@ def generar_informe_pdf(datos_obra, df_cronograma, df_incidencias, df_docs, df_h
         for _, rc in df_cert.iterrows():
             data_c.append([f"#{rc['num_certificacion']}", rc["mes_ano"], f"{rc['importe_bruto']:,.2f} €", f"{rc['retencion_5pct']:,.2f} €", f"{rc['liquido_pagar']:,.2f} €", rc["estado"]])
         t_c = Table(data_c, colWidths=[35, 95, 95, 85, 100, 80])
-        t_c.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#CBD5E0")), ('GRID', (0, 0), (-1, -1), 0.5, colors.grey), ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), ('FONTSIZE', (0, 0), (-1, -1), 8), ('BOTTOMPADDING', (0, 0), (-1, -1), 4)]))
+        t_c.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor("#CBD5E0")),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 4)
+        ]))
         story.append(t_c)
 
     doc.build(story)
@@ -374,7 +387,6 @@ with tab_fase4:
     st.markdown("### 🏗️ Fase 4: Dirección de Obra y Ejecución")
     st.caption("Planificación temporal, curva de inversión, certificaciones oficiales, planos ejecutivos y bitácora de órdenes.")
 
-    # Sub-pestañas operativas de la obra
     subtab_gantt, subtab_cert, subtab_docs, subtab_ordenes = st.tabs([
         "📅 Cronograma y Curva S",
         "📑 Certificaciones Mensuales (5% Retención)",
@@ -416,7 +428,14 @@ with tab_fase4:
                     cursor.execute("DELETE FROM cronograma WHERE obra_id = ?", (obra_id_activa,))
                     dias_totales = meses_obra * 30
                     presupuesto_base = datos_obra["presupuesto_total"]
-                    matriz = [("01. Demoliciones y Mov. Tierras", "Demoliciones y desescombros", 0.00, 0.15, 0.08, "Demoliciones"), ("04. Instalaciones", "Instalación eléctrica y fontanería", 0.12, 0.45, 0.28, "Instalaciones"), ("03. Cerramientos y Cubierta", "Tabiquería Pladur y techos", 0.35, 0.65, 0.18, "Pladur"), ("05. Acabados y Pintura", "Alicatados y solados", 0.55, 0.80, 0.22, "Solados"), ("06. Carpinterías", "Carpinterías interiores y exteriores", 0.70, 0.92, 0.16, "Carpintería"), ("05. Acabados y Pintura", "Pintura general y limpieza", 0.85, 1.00, 0.08, "Pintura")]
+                    matriz = [
+                        ("01. Demoliciones y Mov. Tierras", "Demoliciones y desescombros", 0.00, 0.15, 0.08, "Demoliciones"),
+                        ("04. Instalaciones", "Instalación eléctrica y fontanería", 0.12, 0.45, 0.28, "Instalaciones"),
+                        ("03. Cerramientos y Cubierta", "Tabiquería Pladur y techos", 0.35, 0.65, 0.18, "Pladur"),
+                        ("05. Acabados y Pintura", "Alicatados y solados", 0.55, 0.80, 0.22, "Solados"),
+                        ("06. Carpinterías", "Carpinterías interiores y exteriores", 0.70, 0.92, 0.16, "Carpintería"),
+                        ("05. Acabados y Pintura", "Pintura general y limpieza", 0.85, 1.00, 0.08, "Pintura")
+                    ]
                     for etapa_m, tarea_m, pct_ini, pct_fin, pct_coste, resp_m in matriz:
                         f_ini_calc = fecha_inicio_auto + timedelta(days=int(dias_totales * pct_ini))
                         f_fin_calc = fecha_inicio_auto + timedelta(days=int(dias_totales * pct_fin))
@@ -520,10 +539,10 @@ with tab_fase4:
         with col_d1:
             st.markdown("#### 📤 Registrar Entrega de Plano")
             with st.form("form_documentos", clear_on_submit=True):
-                tipo_doc = st.selectbox("Tipo:", ["Plano Ejecutivo (DWG/PDF)", "Memoria / Pliego", "Presupuesto Aprobado", "Acta de Replanteo", "Certificado de Ensayos"])
+                tipo_doc = st.selectbox("Tipo:", ["Plano Ejecutivo (DWG/PDF)", "Memoria / Pliego", "Presupuesto Aprobado", "Acta de Replanteo", "Otro"])
                 codigo_plano = st.text_input("Código / Ref:", placeholder="Ej: ARQ-02")
                 revision = st.text_input("Revisión:", value="Rev.0")
-                destinatario = st.selectbox("Entregado a:", ["Empresa Constructora", "Promotor / Cliente", "Subcontrata Electricidad", "Subcontrata Fontanería", "Estructurista"])
+                destinatario = st.selectbox("Entregado a:", ["Empresa Constructora", "Promotor / Cliente", "Subcontrata Electricidad", "Subcontrata Fontanería", "Estructurista", "Otro"])
                 descripcion_doc = st.text_area("Observaciones:")
                 archivo_subido = st.file_uploader("Adjuntar Archivo:", type=["pdf", "dwg", "zip", "png", "jpg"])
                 if st.form_submit_button("Registrar Plano"):
@@ -532,8 +551,10 @@ with tab_fase4:
                         if archivo_subido:
                             nombre_seguro = f"{datos_obra['codigo']}_{codigo_plano}_{revision}_{archivo_subido.name}".replace(" ", "_")
                             ruta_guardada = os.path.join(UPLOAD_DIR, nombre_seguro)
-                            with open(ruta_guardada, "wb") as f: f.write(archivo_subido.getbuffer())
-                        cursor.execute("INSERT INTO documentos (obra_id, fecha_entrega, tipo_doc, codigo_plano, revision, destinatario, descripcion, archivo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, datetime.now().strftime("%Y-%m-%d %H:%M"), tipo_doc, codigo_plano, revision, destinatario, descripcion_doc, ruta_guardada))
+                            with open(ruta_guardada, "wb") as f: 
+                                f.write(archivo_subido.getbuffer())
+                        cursor.execute("INSERT INTO documentos (obra_id, fecha_entrega, tipo_doc, codigo_plano, revision, destinatario, descripcion, archivo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                       (obra_id_activa, str(date.today()), tipo_doc, codigo_plano, revision, destinatario, descripcion_doc, ruta_guardada))
                         conn.commit()
                         st.rerun()
 
@@ -544,7 +565,20 @@ with tab_fase4:
                 for _, r_d in df_docs.iterrows():
                     if r_d["archivo_path"] and os.path.exists(r_d["archivo_path"]):
                         with open(r_d["archivo_path"], "rb") as f_desc:
-                            st.download_button(label=f"⬇️ Descargar: {r_d['codigo_plano']} ({r_d['revision']})", data=f_desc, file_name=os.path.basename(r_d["archivo_path"]), key=f"btn_dl_{r_d['id']}")
+                            bytes_data = f_desc.read()
+                            
+                        col_btn1, col_btn2 = st.columns(2)
+                        with col_btn1:
+                            st.download_button(
+                                label=f"⬇️ Descargar {r_d['codigo_plano']}",
+                                data=bytes_data,
+                                file_name=os.path.basename(r_d["archivo_path"]),
+                                key=f"btn_dl_{r_d['id']}"
+                            )
+                        with col_btn2:
+                            b64_pdf = base64.b64encode(bytes_data).decode('utf-8')
+                            pdf_display = f'<a href="data:application/pdf;base64,{b64_pdf}" target="_blank" style="display:inline-block;padding:0.4em 0.8em;color:white;background-color:#2B6CB0;border-radius:5px;text-decoration:none;text-align:center;font-size:0.9em;width:100%;">👁️ Abrir Visor</a>'
+                            st.markdown(pdf_display, unsafe_allow_html=True)
             else:
                 st.info("Sin planos registrados.")
 
@@ -565,9 +599,10 @@ with tab_fase4:
                             for idx_f, f_img_sub in enumerate(fotos_subidas):
                                 nombre_foto = f"FOTO_{datos_obra['codigo']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx_f}_{f_img_sub.name}".replace(" ", "_")
                                 ruta_foto = os.path.join(UPLOAD_DIR, nombre_foto)
-                                with open(ruta_foto, "wb") as f_out: f_out.write(f_img_sub.getbuffer())
+                                with open(ruta_foto, "wb") as f_out: 
+                                    f_out.write(f_img_sub.getbuffer())
                                 rutas_guardadas.append(ruta_foto)
-                        cursor.execute("INSERT INTO incidencias (obra_id, fecha, descripcion, rol_emisor, priority, estado, foto_path) VALUES (?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, datetime.now().strftime("%Y-%m-%d %H:%M"), descripcion, rol, prioridad, "Pendiente", ";".join(rutas_guardadas)))
+                        cursor.execute("INSERT INTO incidencias (obra_id, fecha, descripcion, rol_emisor, prioridad, estado, foto_path) VALUES (?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, datetime.now().strftime("%Y-%m-%d %H:%M"), descripcion, rol, prioridad, "Pendiente", ";".join(rutas_guardadas)))
                         conn.commit()
                         st.rerun()
 
@@ -600,7 +635,8 @@ with tab_fase4:
                             lista_rutas = [p for p in rutas_str.split(";") if p and os.path.exists(p)]
                             cols_imgs = st.columns(min(len(lista_rutas), 3)) if lista_rutas else []
                             for idx_img, p_img in enumerate(lista_rutas):
-                                with cols_imgs[idx_img % 3]: st.image(p_img, use_container_width=True, caption=f"Foto {idx_img+1}")
+                                with cols_imgs[idx_img % 3]: 
+                                    st.image(p_img, use_container_width=True, caption=f"Foto {idx_img+1}")
             else:
                 st.info("Sin órdenes en bitácora.")
 
