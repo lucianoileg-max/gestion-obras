@@ -547,14 +547,14 @@ with tab_fase4:
                 archivo_subido = st.file_uploader("Adjuntar Archivo:", type=["pdf", "dwg", "zip", "png", "jpg"])
                 if st.form_submit_button("Registrar Plano"):
                     if codigo_plano.strip() != "":
-                        ruta_guardada = ""
+                        nombre_seguro = f"{datos_obra['codigo']}_{codigo_plano}_{revision}_{archivo_subido.name}".replace(" ", "_") if archivo_subido else ""
                         if archivo_subido:
-                            nombre_seguro = f"{datos_obra['codigo']}_{codigo_plano}_{revision}_{archivo_subido.name}".replace(" ", "_")
+                            os.makedirs(UPLOAD_DIR, exist_ok=True)
                             ruta_guardada = os.path.join(UPLOAD_DIR, nombre_seguro)
-                            with open(ruta_guardada, "wb") as f: 
-                                f.write(archivo_subido.getbuffer())
+                            with open(ruta_guardada, "wb") as f:
+                                f.write(archivo_subido.getvalue())
                         cursor.execute("INSERT INTO documentos (obra_id, fecha_entrega, tipo_doc, codigo_plano, revision, destinatario, descripcion, archivo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                                       (obra_id_activa, str(date.today()), tipo_doc, codigo_plano, revision, destinatario, descripcion_doc, ruta_guardada))
+                                       (obra_id_activa, str(date.today()), tipo_doc, codigo_plano, revision, destinatario, descripcion_doc, nombre_seguro))
                         conn.commit()
                         st.rerun()
 
@@ -563,22 +563,20 @@ with tab_fase4:
             if not df_docs.empty:
                 st.dataframe(df_docs[["id", "fecha_entrega", "tipo_doc", "codigo_plano", "revision", "destinatario", "descripcion"]], use_container_width=True)
                 for _, r_d in df_docs.iterrows():
-                    if r_d["archivo_path"] and os.path.exists(r_d["archivo_path"]):
-                        with open(r_d["archivo_path"], "rb") as f_desc:
-                            bytes_data = f_desc.read()
-                            
-                        col_btn1, col_btn2 = st.columns(2)
-                        with col_btn1:
+                    ruta_arch = r_d.get("archivo_path", "")
+                    if ruta_arch:
+                        ruta_fisica = os.path.join(UPLOAD_DIR, ruta_arch)
+                        if os.path.exists(ruta_fisica):
+                            with open(ruta_fisica, "rb") as f_desc:
+                                bytes_data = f_desc.read()
                             st.download_button(
-                                label=f"⬇️ Descargar {r_d['codigo_plano']}",
+                                label=f"⬇️ Descargar {r_d['codigo_plano']} ({ruta_arch})",
                                 data=bytes_data,
-                                file_name=os.path.basename(r_d["archivo_path"]),
+                                file_name=ruta_arch,
                                 key=f"btn_dl_{r_d['id']}"
                             )
-                        with col_btn2:
-                            b64_pdf = base64.b64encode(bytes_data).decode('utf-8')
-                            pdf_display = f'<a href="data:application/pdf;base64,{b64_pdf}" target="_blank" style="display:inline-block;padding:0.4em 0.8em;color:white;background-color:#2B6CB0;border-radius:5px;text-decoration:none;text-align:center;font-size:0.9em;width:100%;">👁️ Abrir Visor</a>'
-                            st.markdown(pdf_display, unsafe_allow_html=True)
+                        else:
+                            st.caption(f"📁 Documento registrado: **{ruta_arch}** (Pendiente de subir en este dispositivo)")
             else:
                 st.info("Sin planos registrados.")
 
@@ -596,13 +594,15 @@ with tab_fase4:
                     if descripcion.strip() != "":
                         rutas_guardadas = []
                         if fotos_subidas:
+                            os.makedirs(UPLOAD_DIR, exist_ok=True)
                             for idx_f, f_img_sub in enumerate(fotos_subidas):
                                 nombre_foto = f"FOTO_{datos_obra['codigo']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{idx_f}_{f_img_sub.name}".replace(" ", "_")
                                 ruta_foto = os.path.join(UPLOAD_DIR, nombre_foto)
                                 with open(ruta_foto, "wb") as f_out: 
-                                    f_out.write(f_img_sub.getbuffer())
+                                    f_out.write(f_img_sub.getvalue())
                                 rutas_guardadas.append(ruta_foto)
-                        cursor.execute("INSERT INTO incidencias (obra_id, fecha, descripcion, rol_emisor, prioridad, estado, foto_path) VALUES (?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, datetime.now().strftime("%Y-%m-%d %H:%M"), descripcion, rol, prioridad, "Pendiente", ";".join(rutas_guardadas)))
+                        cursor.execute("INSERT INTO incidencias (obra_id, fecha, descripcion, rol_emisor, prioridad, estado, foto_path) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+                                       (obra_id_activa, datetime.now().strftime("%Y-%m-%d %H:%M"), descripcion, rol, prioridad, "Pendiente", ";".join(rutas_guardadas)))
                         conn.commit()
                         st.rerun()
 
@@ -633,10 +633,13 @@ with tab_fase4:
                         rutas_str = r_inc.get("foto_path", "")
                         if rutas_str:
                             lista_rutas = [p for p in rutas_str.split(";") if p and os.path.exists(p)]
-                            cols_imgs = st.columns(min(len(lista_rutas), 3)) if lista_rutas else []
-                            for idx_img, p_img in enumerate(lista_rutas):
-                                with cols_imgs[idx_img % 3]: 
-                                    st.image(p_img, use_container_width=True, caption=f"Foto {idx_img+1}")
+                            if lista_rutas:
+                                cols_imgs = st.columns(min(len(lista_rutas), 3))
+                                for idx_img, p_img in enumerate(lista_rutas):
+                                    with cols_imgs[idx_img % 3]: 
+                                        st.image(p_img, use_container_width=True, caption=f"Foto {idx_img+1}")
+                            else:
+                                st.caption("🖼️ *Fotos registradas en otra sesión/dispositivo.*")
             else:
                 st.info("Sin órdenes en bitácora.")
 
