@@ -17,7 +17,7 @@ import base64
 st.set_page_config(
     page_title="ERP de Arquitectura y Dirección de Obra", 
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 UPLOAD_DIR = "archivos_obra"
