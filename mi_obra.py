@@ -62,6 +62,7 @@ cursor.execute("CREATE TABLE IF NOT EXISTS incidencias (id INTEGER PRIMARY KEY A
 cursor.execute("CREATE TABLE IF NOT EXISTS cronograma (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, etapa TEXT, tarea TEXT, fecha_inicio TEXT, fecha_fin TEXT, coste_estimado REAL, avance_porcentaje INTEGER DEFAULT 0, responsable TEXT)")
 cursor.execute("CREATE TABLE IF NOT EXISTS documentos (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fecha_entrega TEXT, tipo_doc TEXT, codigo_plano TEXT, revision TEXT, destinatario TEXT, descripcion TEXT, archivo_path TEXT)")
 cursor.execute("CREATE TABLE IF NOT EXISTS anteproyectos (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, titulo TEXT, archivo_path TEXT, fecha TEXT)")
+cursor.execute("CREATE TABLE IF NOT EXISTS buzon_cliente (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fecha TEXT, emisor TEXT, mensaje TEXT)")
 
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS ingenieria_datos (
@@ -81,6 +82,9 @@ try: cursor.execute("ALTER TABLE ingenieria_datos ADD COLUMN coste_estructuras R
 except sqlite3.OperationalError: pass
 try: cursor.execute("ALTER TABLE ingenieria_datos ADD COLUMN archivo_est TEXT")
 except sqlite3.OperationalError: pass
+
+# Tabla para el buzón exclusivo entre Cliente y Arquitecto
+cursor.execute("CREATE TABLE IF NOT EXISTS buzon_cliente (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fecha TEXT, emisor TEXT, mensaje TEXT)")
 
 conn.commit()
 
@@ -318,24 +322,12 @@ if "obra_asignada" not in st.session_state: st.session_state["obra_asignada"] = 
 if not st.session_state["app_iniciada"] or st.session_state["rol_usuario"] is None:
     st.markdown("""
         <style>
-        [data-testid="stSidebar"] { display: none !important; }
-        [data-testid="collapsedControl"] { display: none !important; }
-        header { visibility: hidden !important; }
-        .stApp { background-color: #0F0F0F; }
-        
-        /* Centrado absoluto para la imagen del logotipo */
-        [data-testid="stImage"] { display: flex; justify-content: center; }
-        
-        .main-block { display: flex; flex-direction: column; align-items: center; justify-content: center; margin-top: 5vh; }
-        div.stButton > button {
-            background-color: #0F0F0F !important; color: #FFFFFF !important;
-            border: 1px solid #333333 !important; font-weight: 700 !important;
-            letter-spacing: 2px !important; padding: 0.75rem 1rem !important;
-            border-radius: 4px !important; transition: all 0.3s ease !important;
-        }
-        div.stButton > button:hover { background-color: #1A1A1A !important; border-color: #718096 !important; }
-        </style>
-    """, unsafe_allow_html=True)
+    /* Ocultar elementos nativos de Streamlit */
+    [data-testid="stSidebarNav"] {display: none;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
     col_l1, col_l2, col_l3 = st.columns([1, 1.2, 1])
     with col_l2:
@@ -368,21 +360,91 @@ if not st.session_state["app_iniciada"] or st.session_state["rol_usuario"] is No
 # --- CSS DE LA APLICACIÓN (HOVER BARRA LATERAL) ---
 st.markdown("""
     <style>
+    /* Ocultar elementos nativos de Streamlit */
     [data-testid="stSidebarNav"] {display: none;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+
+    /* Fondo principal oscuro profundo */
+    .stApp { background-color: #0d0d0d !important; }
+
+    /* Tipografía (Aplicada solo al texto, SIN romper los iconos) */
+    html, body {
+        font-family: 'Helvetica Neue', sans-serif !important;
+    }
+    
+    /* Color de texto general claro */
+    [class*="st-"] {
+        color: #E2E8F0 !important;
+    }
+
+    /* Estilo forzado para campos de texto (Inputs y Textareas) */
+    div[data-baseweb="input"] > div,
+    div[data-baseweb="textarea"] > textarea {
+        background-color: #2b2b2b !important; /* Fondo gris oscuro */
+        color: #ffffff !important; /* Letra blanca */
+        border: 1px solid #4a4a4a !important; /* Borde sutil */
+        border-radius: 8px !important;
+    }
+
+    /* Asegurar que el placeholder (texto de fondo) se lea bien */
+    div[data-baseweb="input"] > div::placeholder,
+    div[data-baseweb="textarea"] > textarea::placeholder {
+        color: #a0aabf !important;
+    }
+    
+    /* Diseño de Tarjetas para los Expanders */
+    div[data-testid="stExpander"] {
+        background-color: #1a1a1a !important;
+        border: 1px solid #2d2d2d !important;
+        border-radius: 16px !important;
+        margin-bottom: 15px !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important;
+    }
+
+    /* Botones redondeados y modernos */
+    div.stButton > button {
+        background-color: #2b2b2b !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 20px !important;
+        font-weight: 600 !important;
+        padding: 0.6rem 1.2rem !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    div.stButton > button:hover {
+        background-color: #404040 !important;
+        transform: translateY(-2px);
+    }
+
+    /* Cajas de métricas */
+    [data-testid="stMetric"] {
+        background-color: #1a1a1a !important;
+        border-radius: 12px !important;
+        padding: 15px !important;
+        border: 1px solid #2d2d2d !important;
+    }
+
+    /* Barra lateral colapsable */
     [data-testid="stSidebar"] {
+        background-color: #121212 !important;
         min-width: 15px !important;
         max-width: 15px !important;
         transition: all 0.3s ease-in-out 0.5s !important;
         overflow-x: hidden !important;
+        border-right: 1px solid #2d2d2d !important;
     }
-    [data-testid="stSidebar"]:hover,
-    [data-testid="stSidebar"]:focus-within {
+    
+    [data-testid="stSidebar"]:hover, [data-testid="stSidebar"]:focus-within {
         min-width: 320px !important;
         max-width: 320px !important;
         transition: all 0.3s ease-in-out 0s !important;
     }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
 rol = st.session_state["rol_usuario"]
 
@@ -527,7 +589,7 @@ inversion_total_cliente = datos_obra["presupuesto_total"] + total_honorarios_bas
 # --- CABECERA PRINCIPAL Y ÚNICO BOTÓN MAESTRO DE DESCARGA ---
 col_head1, col_head2 = st.columns([3, 1])
 with col_head1:
-    st.title(f"🏛️ Proyecto: {datos_obra['nombre']}")
+    st.title(f"Proyecto: {datos_obra['nombre']}")
     est_exp = datos_obra.get('estado_expediente', 'En Curso / Activo')
     if rol == "Arquitecto":
         st.caption(f"Ref: {datos_obra['codigo']} | Estado: **{est_exp}** | Inversión Total Cliente: **{inversion_total_cliente:,.2f} €** (Obra: {datos_obra['presupuesto_total']:,.0f} € + Honorarios: {total_honorarios_base:,.0f} € + Tasas: {total_tasas_pagadas:,.0f} €)")
@@ -559,6 +621,81 @@ tab_fase1, tab_fase2, tab_fase3, tab_fase4, tab_fase5 = st.tabs([
 # FASE 1
 # ---------------------------------------------------------
 with tab_fase1:
+    # ---------------------------------------------------------
+    # 1.1 BUZÓN DE COMUNICACIONES RÁPIDAS (Exclusivo Cliente - Arquitecto)
+    # ---------------------------------------------------------
+    if rol in ["Arquitecto", "Cliente"]:
+        # 1. Leemos los mensajes ANTES de dibujar la caja para saber si hay alertas
+        df_buzon = pd.read_sql_query("SELECT * FROM buzon_cliente WHERE obra_id = ? ORDER BY id ASC", conn, params=(obra_id_activa,))
+        
+        # 2. Lógica de alerta: Si el último mensaje es del cliente y tú eres el arquitecto
+        hay_aviso_rojo = False
+        if not df_buzon.empty and rol == "Arquitecto":
+            ultimo_emisor = df_buzon.iloc[-1]["emisor"]
+            if ultimo_emisor != "Arquitecto":
+                hay_aviso_rojo = True
+                
+        # 3. Dibujamos una alerta roja súper visible si hay aviso
+        if hay_aviso_rojo:
+            st.error("🚨 **TIENES UN NUEVO MENSAJE DEL CLIENTE POR LEER**")
+            titulo_buzon = "🚨 💬 BANDEJA DE MENSAJES (NUEVO AVISO)"
+        else:
+            titulo_buzon = "💬 Bandeja de Mensajes y Avisos del Expediente"
+
+        # 4. Creamos el Expander (Cerrado por defecto con expanded=False)
+        with st.expander(titulo_buzon, expanded=False):
+            
+            # --- HISTORIAL EN CAJA CON SCROLL ---
+            st.markdown("##### 📥 Historial de Conversación")
+            chat_container = st.container(height=250)
+            
+            with chat_container:
+                if not df_buzon.empty:
+                    for _, r_msg in df_buzon.iterrows():
+                        c_msg, c_del = st.columns([15, 1])
+                        with c_msg:
+                            if r_msg["emisor"] == "Arquitecto":
+                                st.info(f"📐 **Dirección Facultativa** ({r_msg['fecha']}):\n\n{r_msg['mensaje']}")
+                            else:
+                                st.success(f"🤝 **Promotor / Cliente** ({r_msg['fecha']}):\n\n{r_msg['mensaje']}")
+                        with c_del:
+                            if rol == "Arquitecto":
+                                if st.button("🗑️", key=f"del_msg_{r_msg['id']}", help="Eliminar"):
+                                    cursor.execute("DELETE FROM buzon_cliente WHERE id = ?", (r_msg['id'],))
+                                    conn.commit()
+                                    st.rerun()
+                else:
+                    st.caption("No hay mensajes registrados en este expediente.")
+            
+            st.write("")
+            
+            # --- ZONA DE ESCRITURA Y BOTONES COMPACTOS ---
+            with st.form("form_nuevo_mensaje", clear_on_submit=True):
+                nuevo_msg = st.text_area("Nuevo mensaje oficial para el cliente:", height=100)
+                enviado = st.form_submit_button("📤 Guardar Mensaje en Plataforma")
+                
+                if enviado and nuevo_msg.strip() != "":
+                    fecha_hoy = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    cursor.execute("INSERT INTO buzon_cliente (obra_id, fecha, emisor, mensaje) VALUES (?, ?, ?, ?)", 
+                                   (obra_id_activa, fecha_hoy, rol, nuevo_msg))
+                    conn.commit()
+                    st.rerun()
+
+            # --- AVISOS EXTERNOS (Elegantes y pequeños) ---
+            if rol == "Arquitecto":
+                import urllib.parse
+                mensaje_base = f"Hola, he subido una nueva actualización al portal del proyecto '{datos_obra['nombre']}'. Por favor, entra con tu usuario para revisarlo y confirmarlo."
+                msg_codificado = urllib.parse.quote(mensaje_base)
+                
+                st.caption("🔔 **Notificar actualización al cliente:**")
+                col_wa, col_mail, col_vacia = st.columns([1, 1, 4])
+                with col_wa:
+                    st.markdown(f'<a href="https://wa.me/?text={msg_codificado}" target="_blank" style="text-decoration:none;"><button style="width:100%; padding:5px; background-color:#1E293B; color:#25D366; border:1px solid #2d2d2d; border-radius:4px; font-weight:bold; cursor:pointer; font-size:13px;">📱 WhatsApp</button></a>', unsafe_allow_html=True)
+                with col_mail:
+                    st.markdown(f'<a href="mailto:?subject=Actualización Proyecto {datos_obra["codigo"]}&body={msg_codificado}" target="_blank" style="text-decoration:none;"><button style="width:100%; padding:5px; background-color:#1E293B; color:#D44638; border:1px solid #2d2d2d; border-radius:4px; font-weight:bold; cursor:pointer; font-size:13px;">✉️ Email</button></a>', unsafe_allow_html=True)
+                st.write("")
+
+    
     st.markdown("### 📐 Fase 1: Viabilidad, Anteproyecto y Honorarios")
     if rol == "Arquitecto":
         with st.expander("🤝 1.1 Primer Encuentro y Estudio de Viabilidad", expanded=False):
@@ -604,6 +741,19 @@ with tab_fase1:
 
             if not df_anteproyectos.empty:
                 st.markdown("#### Propuestas Presentadas")
+                if rol == "Arquitecto" and est_exp == "En Curso / Activo":
+                    with st.expander("⚙️ Eliminar Anteproyecto"):
+                        opc_ant = {f"ID {r['id']} - {r['titulo']}": r['id'] for _, r in df_anteproyectos.iterrows()}
+                        sel_ant = st.selectbox("Seleccionar para eliminar:", list(opc_ant.keys()), key="sel_del_ant")
+                        id_ant_sel = opc_ant[sel_ant]
+                        if st.button("🗑️ Eliminar Definitivamente", key="btn_del_ant"):
+                            ruta_arch = df_anteproyectos[df_anteproyectos["id"] == id_ant_sel].iloc[0]["archivo_path"]
+                            if os.path.exists(ruta_arch):
+                                os.remove(ruta_arch) # Borra el archivo físico
+                            cursor.execute("DELETE FROM anteproyectos WHERE id = ?", (id_ant_sel,))
+                            conn.commit()
+                            st.success("Anteproyecto eliminado.")
+                            st.rerun()
                 for _, r_a in df_anteproyectos.iterrows():
                     st.write(f"**{r_a['titulo']}** ({r_a['fecha']})")
                     ruta_arch = r_a["archivo_path"]
@@ -684,13 +834,11 @@ with tab_fase1:
             pendiente_cobro = total_hon_base - cobrado_base
             cobrado_total_facturas = df_honorarios[df_honorarios["estado"] == "Cobrado"]["total_a_cobrar"].sum()
 
-            h1, h2, h3, h4 = st.columns(4)
+            h1, h2, h3 = st.columns(3)
             h1.metric("Honorarios Totales (Base)", f"{total_hon_base:,.2f} €")
             h2.metric("Total Cobrado (c/Impuestos)", f"{cobrado_total_facturas:,.2f} €")
-            h3.metric("Pendiente de Cobro", f"{pendiente_cobro:,.2f} €", delta=-pendiente_cobro)
-            with h4:
-                pdf_propuesta = generar_propuesta_pdf(datos_obra, df_honorarios)
-                st.download_button("📄 Generar Propuesta para Cliente (PDF)", pdf_propuesta, file_name=f"Propuesta_Honorarios_{datos_obra['codigo']}.pdf", mime="application/pdf")
+            h3.metric("Pendiente de Cobro", f"{pendiente_cobro:,.2f} €", delta=f"{-pendiente_cobro:,.2f} €")
+            
             st.divider()
 
         col_h_gen, col_h_man = st.columns(2)
@@ -911,6 +1059,33 @@ with tab_fase4:
             g4.metric("Desfase Físico vs. Financiero", f"{desfase:,.2f} €", delta=desfase)
             st.divider()
 
+            # --- MÓDULO DE ALERTAS Y AUTOCORRECCIÓN ---
+        hoy = str(date.today())
+        retrasadas = df_gantt[(df_gantt["fecha_fin"] < hoy) & (df_gantt["avance_porcentaje"] < 100)]
+        
+        desvio_presupuesto = abs(total_previsto - datos_obra["presupuesto_total"]) > 0.01
+
+        if not retrasadas.empty or desvio_presupuesto:
+            st.markdown("#### ⚠️ Alertas Críticas de Ejecución")
+            if not retrasadas.empty:
+                for _, r in retrasadas.iterrows():
+                    st.error(f"🚨 **Retraso:** '{r['tarea']}' debió finalizar el {r['fecha_fin']} (Avance actual: {r['avance_porcentaje']}%).")
+            
+            if desvio_presupuesto:
+                diferencia = total_previsto - datos_obra["presupuesto_total"]
+                if diferencia > 0:
+                    st.warning(f"⚠️ **Desvío:** El total programado supera el presupuesto en +{diferencia:,.2f} €.")
+                else:
+                    st.warning(f"⚠️ **Desvío:** Falta programar {-diferencia:,.2f} € para alcanzar el presupuesto base.")
+                
+                if st.button("🪄 Auto-Ajustar Partidas Proporcionalmente al Presupuesto Base"):
+                    if total_previsto > 0:
+                        factor_escala = datos_obra["presupuesto_total"] / total_previsto
+                        cursor.execute("UPDATE cronograma SET coste_estimado = ROUND(coste_estimado * ?, 2) WHERE obra_id = ?", (factor_escala, obra_id_activa))
+                        conn.commit()
+                        st.rerun()
+        # ------------------------------------------
+
         if est_exp == "En Curso / Activo" and rol == "Arquitecto":
             with st.expander("⚡ Certificar % de Avance Físico en Obra (Por Partida)"):
                 if not df_gantt.empty:
@@ -1115,6 +1290,22 @@ with tab_fase4:
 
         with col_d2:
             st.markdown("#### 📑 Historial de Planos en Obra")
+            if not df_docs.empty and rol == "Arquitecto" and est_exp == "En Curso / Activo":
+                with st.expander("⚙️ Eliminar Plano / Documento del Historial"):
+                    opc_doc = {f"ID {r['id']} - {r['codigo_plano']} (Rev. {r['revision']})": r['id'] for _, r in df_docs.iterrows()}
+                    sel_doc = st.selectbox("Seleccionar plano obsoleto o erróneo:", list(opc_doc.keys()), key="sel_del_doc")
+                    id_doc_sel = opc_doc[sel_doc]
+                    if st.button("🗑️ Eliminar Documento", key="btn_del_doc"):
+                        ruta_doc = df_docs[df_docs["id"] == id_doc_sel].iloc[0]["archivo_path"]
+                        if ruta_doc and os.path.exists(ruta_doc):
+                            try:
+                                os.remove(ruta_doc) # Limpia el disco duro
+                            except:
+                                pass
+                        cursor.execute("DELETE FROM documentos WHERE id = ?", (id_doc_sel,))
+                        conn.commit()
+                        st.warning("Plano eliminado del Entorno Común de Datos.")
+                        st.rerun()
             if not df_docs.empty:
                 st.dataframe(df_docs[["id", "fecha_entrega", "tipo_doc", "codigo_plano", "revision", "destinatario", "descripcion"]], width="stretch")
                 for _, r_d in df_docs.iterrows():
