@@ -1098,7 +1098,7 @@ with tab_fase4:
                     st.warning(f"**Desvío:** Falta programar {-diferencia:,.2f} € para alcanzar el presupuesto base.")
                 
                 # NUEVO: Desglose para identificar el origen del desvío
-                st.markdown("**🔍 Origen del coste programado (Desglose por Etapas):**")
+                st.markdown("** Origen del coste programado (Desglose por Etapas):**")
                 desglose = df_gantt.groupby("etapa")["coste_estimado"].sum().reset_index()
                 desglose = desglose.sort_values(by="coste_estimado", ascending=False)
                 st.dataframe(desglose, use_container_width=True, hide_index=True)
