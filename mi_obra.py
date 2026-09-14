@@ -1097,7 +1097,18 @@ with tab_fase4:
                 else:
                     st.warning(f"**Desvío:** Falta programar {-diferencia:,.2f} € para alcanzar el presupuesto base.")
                 
+                # NUEVO: Desglose para identificar el origen del desvío
+                st.markdown("**🔍 Origen del coste programado (Desglose por Etapas):**")
+                desglose = df_gantt.groupby("etapa")["coste_estimado"].sum().reset_index()
+                desglose = desglose.sort_values(by="coste_estimado", ascending=False)
+                st.dataframe(desglose, use_container_width=True, hide_index=True)
+                
                 if st.button("Auto-Ajustar Partidas Proporcionalmente al Presupuesto Base"):
+                    if total_previsto > 0:
+                        factor_escala = datos_obra["presupuesto_total"] / total_previsto
+                        cursor.execute("UPDATE cronograma SET coste_estimado = ROUND(coste_estimado * ?, 2) WHERE obra_id = ?", (factor_escala, obra_id_activa))
+                        conn.commit()
+                        st.rerun()
                     if total_previsto > 0:
                         factor_escala = datos_obra["presupuesto_total"] / total_previsto
                         cursor.execute("UPDATE cronograma SET coste_estimado = ROUND(coste_estimado * ?, 2) WHERE obra_id = ?", (factor_escala, obra_id_activa))
