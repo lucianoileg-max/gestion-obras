@@ -654,37 +654,117 @@ if rol == "Arquitecto":
                     except sqlite3.IntegrityError:
                         st.sidebar.error("El nombre de usuario ya existe.")
 
-    with st.sidebar.expander("Calculadora COAC Express", expanded=False):
-        st.caption(f"Módulo Básico COAC: **{MODULO_BASICO_COAC} €/m²**")
-        c_sup = st.number_input("Superficie Construida (m²):", min_value=1.0, value=sup_guardada, step=10.0, key="coac_sup")
-        c_ub = st.selectbox("Ubicación (CG):", list(coef_ubicacion.keys()), index=0, key="coac_ub")
-        c_tip = st.selectbox("Tipo de Obra (CT):", list(coef_tipologia.keys()), index=4, key="coac_tip")
-        c_uso = st.selectbox("Uso (CU):", list(coef_uso.keys()), index=0, key="coac_uso")
-        c_cal = st.selectbox("Calidad (CQ):", list(coef_calidad.keys()), index=1, key="coac_cal")
-        cg_val = coef_ubicacion[c_ub]
-        ct_val = coef_tipologia[c_tip]
-        cu_val = coef_uso[c_uso]
-        cq_val = coef_calidad[c_cal]
-        
-        pem_coac_calc = c_sup * MODULO_BASICO_COAC * cg_val * ct_val * cq_val * cu_val
-        porc_hon_coac = 0.12 if pem_coac_calc < 50000 else 0.10
-        hon_coac_calc = pem_coac_calc * porc_hon_coac
-        pec_coac_calc = pem_coac_calc * 1.19
+    with st.sidebar.expander("Calculadora COAC y Trámites", expanded=False):
+        # Selector del tipo de encargo administrativo
+        tipo_calculo = st.selectbox(
+            "Tipo de Encargo:",
+            [
+                "1. Proyecto Completo (Baremo)",
+                "2. Cédula de Habitabilidad",
+                "3. Certificado Energético (CEE)",
+                "4. Asesoramiento / Informe"
+            ]
+        )
 
         st.markdown("---")
-        st.write(f"**PEM Estimado:** `{pem_coac_calc:,.2f} €`")
-        st.write(f"**PEC Contrata (19%):** `{pec_coac_calc:,.2f} €`")
-        st.success(f"**Honorarios ({int(porc_hon_coac*100)}%):** {hon_coac_calc:,.2f} €")
 
-        col_btn_c1, col_btn_c2 = st.columns(2)
-        with col_btn_c1:
-            if st.button("Aplicar PEC", use_container_width=True):
-                cursor.execute("UPDATE obras SET presupuesto_total = ?, honorarios_base = ?, superficie_construida = ? WHERE id = ?", (round(pec_coac_calc, 2), round(hon_coac_calc, 2), c_sup, obra_id_activa))
+        # ---------------------------------------------------------
+        # 1. PROYECTO COMPLETO (Tu código original intacto)
+        # ---------------------------------------------------------
+        if tipo_calculo == "1. Proyecto Completo (Baremo)":
+            st.caption(f"Módulo Básico COAC: **{MODULO_BASICO_COAC} €/m²**")
+            c_sup = st.number_input("Superficie Construida (m²):", min_value=1.0, value=sup_guardada, step=10.0, key="coac_sup")
+            c_ub = st.selectbox("Ubicación (CG):", list(coef_ubicacion.keys()), index=0, key="coac_ub")
+            c_tip = st.selectbox("Tipo de Obra (CT):", list(coef_tipologia.keys()), index=4, key="coac_tip")
+            c_uso = st.selectbox("Uso (CU):", list(coef_uso.keys()), index=0, key="coac_uso")
+            c_cal = st.selectbox("Calidad (CQ):", list(coef_calidad.keys()), index=1, key="coac_cal")
+            
+            cg_val = coef_ubicacion[c_ub]
+            ct_val = coef_tipologia[c_tip]
+            cu_val = coef_uso[c_uso]
+            cq_val = coef_calidad[c_cal]
+            
+            pem_coac_calc = c_sup * MODULO_BASICO_COAC * cg_val * ct_val * cq_val * cu_val
+            porc_hon_coac = 0.12 if pem_coac_calc < 50000 else 0.10
+            hon_coac_calc = pem_coac_calc * porc_hon_coac
+            pec_coac_calc = pem_coac_calc * 1.19
+
+            st.write(f"**PEM Estimado:** `{pem_coac_calc:,.2f} €`")
+            st.write(f"**PEC Contrata (19%):** `{pec_coac_calc:,.2f} €`")
+            st.success(f"**Honorarios ({int(porc_hon_coac*100)}%):** {hon_coac_calc:,.2f} €")
+
+            col_btn_c1, col_btn_c2 = st.columns(2)
+            with col_btn_c1:
+                if st.button("Aplicar PEC", use_container_width=True):
+                    cursor.execute("UPDATE obras SET presupuesto_total = ?, honorarios_base = ?, superficie_construida = ? WHERE id = ?", (round(pec_coac_calc, 2), round(hon_coac_calc, 2), c_sup, obra_id_activa))
+                    conn.commit()
+                    st.rerun()
+            with col_btn_c2:
+                pdf_coac_bytes = generar_informe_coac_pdf(datos_obra["nombre"], datos_obra["codigo"], "D. Cliente Promotor", "Cataluña", c_sup, pem_coac_calc, hon_coac_calc, porc_hon_coac, cu_val)
+                st.download_button(label="PDF COAC", data=pdf_coac_bytes, file_name=f"Valoracion_COAC_{datos_obra['codigo']}.pdf", mime="application/pdf", use_container_width=True)
+
+        # ---------------------------------------------------------
+        # 2. CÉDULA DE HABITABILIDAD (2ª Ocupación)
+        # ---------------------------------------------------------
+        elif tipo_calculo == "2. Cédula de Habitabilidad":
+            st.caption("Cálculo paramétrico de mercado para Cédulas")
+            sup_util = st.number_input("Superficie Útil (m²):", min_value=1.0, value=80.0, step=5.0)
+            
+            # Fórmula de ejemplo: 120€ de base + 0.5€ por cada m2 que exceda los 80m2
+            coste_base_cedula = 120.0 
+            coste_extra_m2 = 0.5 * max(0, sup_util - 80)
+            total_cedula = coste_base_cedula + coste_extra_m2
+            
+            st.success(f"**Honorarios Sugeridos:** {total_cedula:,.2f} €")
+            
+            if st.button("Añadir a Cuadro de Honorarios", use_container_width=True, key="btn_cedula"):
+                iva_c = total_cedula * 0.21
+                irpf_c = total_cedula * 0.15 # Retención estándar IRPF profesionales
+                total_cobrar = total_cedula + iva_c - irpf_c
+                cursor.execute("INSERT INTO honorarios (obra_id, fase, porcentaje, base_imponible, iva, retencion_irpf, total_a_cobrar, estado, fecha_emision, fecha_cobro) VALUES (?, ?, 0.0, ?, ?, ?, ?, 'Pendiente', '-', '-')", (obra_id_activa, "Trámite Administrativo: Cédula de Habitabilidad", total_cedula, iva_c, irpf_c, total_cobrar))
                 conn.commit()
                 st.rerun()
-        with col_btn_c2:
-            pdf_coac_bytes = generar_informe_coac_pdf(datos_obra["nombre"], datos_obra["codigo"], "D. Cliente Promotor", "Cataluña", c_sup, pem_coac_calc, hon_coac_calc, porc_hon_coac, cu_val)
-            st.download_button(label="PDF COAC", data=pdf_coac_bytes, file_name=f"Valoracion_COAC_{datos_obra['codigo']}.pdf", mime="application/pdf", use_container_width=True)
+
+        # ---------------------------------------------------------
+        # 3. CERTIFICADO ENERGÉTICO (CEE)
+        # ---------------------------------------------------------
+        elif tipo_calculo == "3. Certificado Energético (CEE)":
+            st.caption("Cálculo paramétrico de mercado para CEE")
+            sup_cee = st.number_input("Superficie Construida (m²):", min_value=1.0, value=100.0, step=10.0, key="cee_sup")
+            
+            # Fórmula de ejemplo: 150€ de base + 0.8€ por cada m2 que exceda los 100m2
+            coste_base_cee = 150.0
+            coste_extra_cee = 0.8 * max(0, sup_cee - 100)
+            total_cee = coste_base_cee + coste_extra_cee
+            
+            st.success(f"**Honorarios Sugeridos:** {total_cee:,.2f} €")
+            
+            if st.button("Añadir a Cuadro de Honorarios", use_container_width=True, key="btn_cee"):
+                iva_cee = total_cee * 0.21
+                irpf_cee = total_cee * 0.15
+                total_cobrar_cee = total_cee + iva_cee - irpf_cee
+                cursor.execute("INSERT INTO honorarios (obra_id, fase, porcentaje, base_imponible, iva, retencion_irpf, total_a_cobrar, estado, fecha_emision, fecha_cobro) VALUES (?, ?, 0.0, ?, ?, ?, ?, 'Pendiente', '-', '-')", (obra_id_activa, "Trámite Administrativo: Certificación Energética", total_cee, iva_cee, irpf_cee, total_cobrar_cee))
+                conn.commit()
+                st.rerun()
+
+        # ---------------------------------------------------------
+        # 4. ASESORAMIENTO / INFORME TÉCNICO
+        # ---------------------------------------------------------
+        elif tipo_calculo == "4. Asesoramiento / Informe":
+            st.caption("Cálculo por bolsa de horas de consultoría")
+            horas_est = st.number_input("Horas estimadas de trabajo:", min_value=1.0, value=5.0, step=0.5)
+            precio_hora = st.number_input("Precio / Hora (€):", min_value=20.0, value=65.0, step=5.0)
+            
+            total_asesoria = horas_est * precio_hora
+            st.success(f"**Honorarios Sugeridos:** {total_asesoria:,.2f} €")
+            
+            if st.button("Añadir a Cuadro de Honorarios", use_container_width=True, key="btn_asesoria"):
+                iva_as = total_asesoria * 0.21
+                irpf_as = total_asesoria * 0.15
+                total_cobrar_as = total_asesoria + iva_as - irpf_as
+                cursor.execute("INSERT INTO honorarios (obra_id, fase, porcentaje, base_imponible, iva, retencion_irpf, total_a_cobrar, estado, fecha_emision, fecha_cobro) VALUES (?, ?, 0.0, ?, ?, ?, ?, 'Pendiente', '-', '-')", (obra_id_activa, "Asesoramiento Técnico / Peritaje", total_asesoria, iva_as, irpf_as, total_cobrar_as))
+                conn.commit()
+                st.rerun()
 
 # --- CONSULTAS DE DATOS ---
 df_honorarios = pd.read_sql_query("SELECT * FROM honorarios WHERE obra_id = ?", conn, params=(obra_id_activa,))
