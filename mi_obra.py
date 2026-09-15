@@ -12,7 +12,7 @@ from reportlab.lib.units import cm
 import io
 import os
 import base64
- 
+
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
     page_title="Portal de Obra · Luciano I. Leguizamón",
@@ -20,7 +20,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
- 
+
 # --- SISTEMA DE DISEÑO CORPORATIVO (mismo lenguaje visual que la web y el dossier) ---
 # Los colores de fondo, texto e inputs los pone el tema oficial de Streamlit
 # (ver archivo .streamlit/config.toml) para no romper nada interno de Streamlit.
@@ -28,7 +28,7 @@ st.set_page_config(
 BRAND_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap');
- 
+
 :root{
     --oak:#7C5A38; --oak-soft:#A4805A;
     --charcoal-card:#1F2224;
@@ -37,29 +37,29 @@ BRAND_CSS = """
     --sans:'IBM Plex Sans', -apple-system, Arial, sans-serif;
     --mono:'IBM Plex Mono', Consolas, monospace;
 }
- 
+
 /* Ocultar elementos nativos de Streamlit */
 [data-testid="stSidebarNav"] {display: none;}
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
- 
+
 /* Ocultar los iconos decorativos nativos de Streamlit (chevrons de expanders,
    flecha de plegar la barra lateral, etc.) — evita el problema de iconos rotos
    si a alguien le falla la carga de la fuente de iconos, y da un look más limpio */
 [data-testid="stIconMaterial"] { display: none !important; }
- 
- 
+
+
 .stApp, .stApp p, .stApp span, .stApp li, .stMarkdown {
     font-family: var(--sans);
 }
- 
+
 /* Titulares con la serif de marca */
 .stApp h1, .stApp h2, .stApp h3 {
     font-family: var(--serif) !important;
     font-weight: 600 !important;
     letter-spacing: -0.01em;
 }
- 
+
 /* Etiquetas de campos y métricas: mono, mayúsculas, espaciadas (estilo "plano técnico") */
 [data-testid="stWidgetLabel"] p, [data-testid="stMetricLabel"] {
     font-family: var(--mono) !important;
@@ -72,7 +72,7 @@ footer {visibility: hidden;}
     font-family: var(--mono) !important;
     color: var(--oak-soft) !important;
 }
- 
+
 /* Tarjetas: expanders, formularios, métricas (solo borde/acento, sin tocar tipografía interna) */
 [data-testid="stExpander"], [data-testid="stForm"], [data-testid="stMetric"] {
     background-color: var(--charcoal-card) !important;
@@ -80,7 +80,7 @@ footer {visibility: hidden;}
     border-top: 2px solid var(--oak) !important;
     border-radius: 4px !important;
 }
- 
+
 /* Botones: acento óxido/oak de marca */
 [data-testid="stButton"] button, [data-testid="stFormSubmitButton"] button {
     background-color: var(--oak) !important;
@@ -95,7 +95,7 @@ footer {visibility: hidden;}
 [data-testid="stButton"] button:hover, [data-testid="stFormSubmitButton"] button:hover {
     background-color: var(--oak-soft) !important;
 }
- 
+
 /* Pestañas (Fases de obra) al estilo "eyebrow" de la web (usan emoji, no iconos de fuente: seguro) */
 button[data-baseweb="tab"] p {
     font-family: var(--mono) !important;
@@ -103,7 +103,7 @@ button[data-baseweb="tab"] p {
     letter-spacing: .04em !important;
 }
 div[data-baseweb="tab-highlight"] { background-color: var(--oak) !important; }
- 
+
 /* Barra lateral colapsable */
 [data-testid="stSidebar"] {
     min-width: 15px !important;
@@ -116,10 +116,10 @@ div[data-baseweb="tab-highlight"] { background-color: var(--oak) !important; }
     max-width: 320px !important;
     transition: all 0.3s ease-in-out 0s !important;
 }
- 
+
 /* Centrar imágenes (útil para el logo del login y no afecta a las de ancho completo) */
 [data-testid="stImage"] { display: flex; justify-content: center; }
- 
+
 /* Pantalla de login: tarjeta centrada al estilo del dossier (contenedor real de Streamlit) */
 [data-testid="stVerticalBlockBorderWrapper"] {
     background-color: var(--charcoal-card);
@@ -136,14 +136,14 @@ div[data-baseweb="tab-highlight"] { background-color: var(--oak) !important; }
 </style>
 """
 st.markdown(BRAND_CSS, unsafe_allow_html=True)
- 
+
 UPLOAD_DIR = "archivos_obra"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
- 
+
 # --- BASE DE DATOS LOCAL ---
 conn = sqlite3.connect("control_obras.db", check_same_thread=False, timeout=10)
 cursor = conn.cursor()
- 
+
 # Tablas de Usuarios y Control de Acceso
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS usuarios (
@@ -159,7 +159,7 @@ cursor.execute("SELECT COUNT(*) FROM usuarios WHERE rol = 'Arquitecto'")
 if cursor.fetchone()[0] == 0:
     cursor.execute("INSERT INTO usuarios (usuario, password, rol, obra_id) VALUES ('admin', 'admin123', 'Arquitecto', 0)")
     conn.commit()
- 
+
 # Tablas Maestras
 cursor.execute("CREATE TABLE IF NOT EXISTS obras (id INTEGER PRIMARY KEY AUTOINCREMENT, nombre TEXT UNIQUE, codigo TEXT, presupuesto_total REAL)")
 try: cursor.execute("ALTER TABLE obras ADD COLUMN estado_expediente TEXT DEFAULT 'En Curso / Activo'")
@@ -168,7 +168,7 @@ try: cursor.execute("ALTER TABLE obras ADD COLUMN honorarios_base REAL DEFAULT 1
 except sqlite3.OperationalError: pass
 try: cursor.execute("ALTER TABLE obras ADD COLUMN superficie_construida REAL DEFAULT 120.0")
 except sqlite3.OperationalError: pass
- 
+
 cursor.execute("CREATE TABLE IF NOT EXISTS honorarios (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fase TEXT, porcentaje REAL, base_imponible REAL, iva REAL, retencion_irpf REAL, total_a_cobrar REAL, estado TEXT, fecha_emision TEXT, fecha_cobro TEXT)")
 cursor.execute("CREATE TABLE IF NOT EXISTS tramites (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, organismo TEXT, tipo_tramite TEXT, num_expediente TEXT, fecha_solicitud TEXT, fecha_limite TEXT, tasas_euros REAL, estado TEXT, observaciones TEXT)")
 cursor.execute("CREATE TABLE IF NOT EXISTS licitaciones (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, capitulo TEXT, presupuesto_estimado REAL, empresa_a TEXT, oferta_a REAL, empresa_b TEXT, oferta_b REAL, empresa_c TEXT, oferta_c REAL, empresa_adjudicada TEXT, monto_adjudicado REAL, estado TEXT)")
@@ -180,7 +180,7 @@ cursor.execute("CREATE TABLE IF NOT EXISTS cronograma (id INTEGER PRIMARY KEY AU
 cursor.execute("CREATE TABLE IF NOT EXISTS documentos (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fecha_entrega TEXT, tipo_doc TEXT, codigo_plano TEXT, revision TEXT, destinatario TEXT, descripcion TEXT, archivo_path TEXT)")
 cursor.execute("CREATE TABLE IF NOT EXISTS anteproyectos (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, titulo TEXT, archivo_path TEXT, fecha TEXT)")
 cursor.execute("CREATE TABLE IF NOT EXISTS buzon_cliente (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fecha TEXT, emisor TEXT, mensaje TEXT)")
- 
+
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS ingenieria_datos (
         id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER UNIQUE, tipo_terreno TEXT, tension_adm REAL, 
@@ -199,117 +199,223 @@ try: cursor.execute("ALTER TABLE ingenieria_datos ADD COLUMN coste_estructuras R
 except sqlite3.OperationalError: pass
 try: cursor.execute("ALTER TABLE ingenieria_datos ADD COLUMN archivo_est TEXT")
 except sqlite3.OperationalError: pass
- 
+
 # Tabla para el buzón exclusivo entre Cliente y Arquitecto
 cursor.execute("CREATE TABLE IF NOT EXISTS buzon_cliente (id INTEGER PRIMARY KEY AUTOINCREMENT, obra_id INTEGER, fecha TEXT, emisor TEXT, mensaje TEXT)")
- 
+
 conn.commit()
- 
+
 # --- DATOS Y COEFICIENTES COAC ---
 MODULO_BASICO_COAC = 677
 coef_ubicacion = {"Cerdanya / Vall d'Aran / Alt Urgell / Resto de Barcelona (0.95)": 0.95, "Barcelona Ciudad y metropolitana (1.00)": 1.00, "Girona / Tarragona / Lleida (0.95)": 0.95, "Comarcas Lleida / Tierras del Ebro (0.90)": 0.90}
 coef_tipologia = {"Obra Nueva aislada (1.20)": 1.20, "Obra Nueva entre medianeras (1.00)": 1.00, "Rehabilitación integral (0.90)": 0.90, "Reforma que afectan estructuras (0.70)": 0.70, "Reforma que no afectan estructuras (0.58)": 0.58, "Reforma leve (pintura, acabados) (0.30)": 0.30}
 coef_uso = {"Vivienda / Residencial (unifamiliares, bloques y pareados) (1.00)": 1.00, "Oficinas y Administrativo (1.00)": 1.00, "Comercial / Locales (1.20)": 1.20, "Industrial / Almacenes (0.60)": 0.60, "Dotacional (Sanitario, Educativo) (1.10)": 1.10}
 coef_calidad = {"Económico (0.85)": 0.85, "Estándar (1.00)": 1.00, "Premium (1.20)": 1.20}
- 
+
 # --- GENERADORES DE PDF ---
+from reportlab.lib.utils import ImageReader
+
 def dibujar_membrete_corporativo(canvas, doc):
     canvas.saveState()
     c_negro = colors.HexColor("#1A1C1D")
-    c_gris_oscuro = colors.HexColor("#7C5A38")
-    c_gris_claro = colors.HexColor("#EFEDE7")
+    c_oak = colors.HexColor("#7C5A38")
+    c_paper = colors.HexColor("#EFEDE7")
+    alto_cabecera = 1.7*cm
+
+    # Cabecera oscura
     canvas.setFillColor(c_negro)
-    canvas.rect(0, A4[1] - 1.2*cm, A4[0], 1.2*cm, fill=1, stroke=0)
-    canvas.setFillColor(c_gris_oscuro)
-    canvas.rect(0, A4[1] - 1.4*cm, A4[0], 0.2*cm, fill=1, stroke=0)
+    canvas.rect(0, A4[1] - alto_cabecera, A4[0], alto_cabecera, fill=1, stroke=0)
+    canvas.setFillColor(c_oak)
+    canvas.rect(0, A4[1] - alto_cabecera - 0.15*cm, A4[0], 0.15*cm, fill=1, stroke=0)
+
+    # Logo (versión clara, sobre fondo oscuro)
+    logo_path = "logo_estudio.png"
+    x_texto = 1.5*cm
+    if os.path.exists(logo_path):
+        try:
+            img = ImageReader(logo_path)
+            iw, ih = img.getSize()
+            alto_logo = 1.1*cm
+            ancho_logo = alto_logo * (iw / ih)
+            canvas.drawImage(img, 1.3*cm, A4[1] - alto_cabecera + (alto_cabecera - 0.15*cm - alto_logo)/2,
+                              width=ancho_logo, height=alto_logo, mask='auto')
+            x_texto = 1.3*cm + ancho_logo + 0.4*cm
+        except Exception:
+            pass
+
     canvas.setFillColor(colors.white)
-    canvas.setFont("Helvetica-Bold", 10)
-    canvas.drawString(1.5*cm, A4[1] - 0.8*cm, "ESTUDIO DE ARQUITECTURA & GESTIÓN DE OBRA")
-    canvas.setFillColor(c_gris_claro)
-    canvas.rect(0, 0, A4[0], 0.8*cm, fill=1, stroke=0)
+    canvas.setFont("Helvetica-Bold", 11)
+    canvas.drawString(x_texto, A4[1] - 0.75*cm, "LUCIANO I. LEGUIZAMÓN")
+    canvas.setFont("Helvetica", 7.5)
+    canvas.setFillColor(colors.HexColor("#B9B6AC"))
+    canvas.drawString(x_texto, A4[1] - 1.15*cm, "Arquitecto · COAC nº 85.582 · Delegación de Girona")
+
+    # Pie de página
+    canvas.setFillColor(c_paper)
+    canvas.rect(0, 0, A4[0], 0.9*cm, fill=1, stroke=0)
     canvas.setFillColor(c_negro)
-    canvas.rect(0, 0.8*cm, A4[0], 0.1*cm, fill=1, stroke=0)
-    canvas.setFont("Helvetica", 8)
-    canvas.setFillColor(c_gris_oscuro)
-    canvas.drawString(1.5*cm, 0.3*cm, "Documento Técnico Oficial - Expediente Consolidado")
-    canvas.drawRightString(A4[0] - 1.5*cm, 0.3*cm, f"Página {doc.page}")
+    canvas.rect(0, 0.9*cm, A4[0], 0.06*cm, fill=1, stroke=0)
+    canvas.setFont("Helvetica", 7.5)
+    canvas.setFillColor(c_oak)
+    canvas.drawString(1.5*cm, 0.35*cm, "Documento técnico generado por el sistema de gestión de obra · No válido sin firma digital del expediente")
+    canvas.setFillColor(c_negro)
+    canvas.drawRightString(A4[0] - 1.5*cm, 0.35*cm, f"Página {doc.page}")
     canvas.restoreState()
- 
+
 def generar_expediente_maestro_pdf(datos_obra, df_hon, df_tra, df_lic, df_cer, cierre_row):
     buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=55, bottomMargin=50)
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=68, bottomMargin=50)
     story = []
     styles = getSampleStyleSheet()
     c_primary = colors.HexColor("#1A1C1D")
     c_secondary = colors.HexColor("#7C5A38")
     c_text = colors.HexColor("#1A1C1D")
-    t_style = ParagraphStyle("TitleDoc", parent=styles["Heading1"], fontSize=14, textColor=c_primary, spaceAfter=4, alignment=1, fontName="Helvetica-Bold")
-    sub_style = ParagraphStyle("SubDoc", parent=styles["Heading2"], fontSize=10, textColor=c_secondary, spaceBefore=8, spaceAfter=3, fontName="Helvetica-Bold")
-    n_style = ParagraphStyle("NormDoc", parent=styles["Normal"], fontSize=8.5, textColor=c_text, leading=11)
+    c_muted = colors.HexColor("#53585C")
+    c_line = colors.HexColor("#C9C4B8")
+    c_zebra = colors.HexColor("#F6F4EE")
+
+    t_style = ParagraphStyle("TitleDoc", parent=styles["Heading1"], fontSize=16, textColor=c_primary, spaceAfter=2, alignment=1, fontName="Times-Bold")
+    sub_style = ParagraphStyle("SubDoc", parent=styles["Heading2"], fontSize=11, textColor=c_secondary, spaceBefore=14, spaceAfter=5, fontName="Helvetica-Bold", borderWidth=0)
+    n_style = ParagraphStyle("NormDoc", parent=styles["Normal"], fontSize=8.5, textColor=c_text, leading=12)
     n_bold = ParagraphStyle("NormBold", parent=n_style, fontName="Helvetica-Bold")
- 
-    story.append(Spacer(1, 5))
-    story.append(Paragraph("DOSSIER DE EXPEDIENTE MAESTRO - RESUMEN EJECUTIVO", t_style))
-    story.append(Paragraph(f"<b>Referencia:</b> {datos_obra['codigo']} &nbsp;|&nbsp; <b>Proyecto:</b> {datos_obra['nombre']} &nbsp;|&nbsp; <b>Estado:</b> {datos_obra.get('estado_expediente', 'En Curso')}", ParagraphStyle("SubHead", parent=n_style, alignment=1)))
-    story.append(Paragraph(f"<b>Fecha de Emisión:</b> {datetime.now().strftime('%d/%m/%Y')}", ParagraphStyle("SubHead2", parent=n_style, alignment=1)))
-    story.append(Spacer(1, 8))
- 
-    story.append(Paragraph("1. FASE 1 - Honorarios y Propuesta Comercial", sub_style))
+    n_muted = ParagraphStyle("NormMuted", parent=n_style, textColor=c_muted, fontName="Helvetica-Oblique")
+    n_center = ParagraphStyle("NormCenter", parent=n_style, alignment=1)
+
+    tot_hon = df_hon["base_imponible"].sum() if not df_hon.empty else 0.0
+    tot_tasas = df_tra["tasas_euros"].sum() if not df_tra.empty else 0.0
+    tot_pec = datos_obra["presupuesto_total"]
+    tot_cer = df_cer["importe_bruto"].sum() if not df_cer.empty else 0.0
+    inversion_total = tot_pec + tot_hon + tot_tasas
+
+    # --- PORTADA DEL EXPEDIENTE ---
+    story.append(Spacer(1, 4))
+    story.append(Paragraph("DOSSIER DE EXPEDIENTE MAESTRO", t_style))
+    story.append(Paragraph("Resumen Ejecutivo del Proyecto", ParagraphStyle("Sub0", parent=n_center, fontSize=10, textColor=c_secondary, fontName="Helvetica-Bold", spaceAfter=10)))
+
+    # Ficha de datos del expediente (título-bloque)
+    ficha_data = [
+        [Paragraph("<b>PROYECTO</b>", n_muted), Paragraph(datos_obra['nombre'].upper(), n_bold),
+         Paragraph("<b>REFERENCIA</b>", n_muted), Paragraph(str(datos_obra['codigo']), n_bold)],
+        [Paragraph("<b>ESTADO</b>", n_muted), Paragraph(datos_obra.get('estado_expediente', 'En Curso / Activo'), n_style),
+         Paragraph("<b>FECHA DE EMISIÓN</b>", n_muted), Paragraph(datetime.now().strftime('%d/%m/%Y'), n_style)],
+    ]
+    t_ficha = Table(ficha_data, colWidths=[75, 175, 85, 165])
+    t_ficha.setStyle(TableStyle([
+        ('BOX', (0,0), (-1,-1), 0.75, c_primary), ('INNERGRID', (0,0), (-1,-1), 0.4, c_line),
+        ('BACKGROUND', (0,0), (-1,-1), colors.white), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('TOPPADDING', (0,0), (-1,-1), 6), ('BOTTOMPADDING', (0,0), (-1,-1), 6), ('LEFTPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t_ficha)
+    story.append(Spacer(1, 10))
+
+    # Resumen financiero global (visión de conjunto antes del detalle por fases)
+    story.append(Paragraph("RESUMEN FINANCIERO GLOBAL", sub_style))
+    resumen_data = [
+        ["Concepto", "Importe (€)"],
+        ["Honorarios profesionales (base)", f"{tot_hon:,.2f}"],
+        ["Tasas y gestión municipal", f"{tot_tasas:,.2f}"],
+        ["Presupuesto de Ejecución de Contrata (PEC)", f"{tot_pec:,.2f}"],
+        ["Inversión total del cliente", f"{inversion_total:,.2f}"],
+    ]
+    t_resumen = Table(resumen_data, colWidths=[350, 130])
+    t_resumen.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), c_primary), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+        ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('GRID', (0,0), (-1,-1), 0.5, c_line), ('ALIGN', (1,0), (1,-1), 'RIGHT'),
+        ('TOPPADDING', (0,0), (-1,-1), 5), ('BOTTOMPADDING', (0,0), (-1,-1), 5),
+        ('LINEABOVE', (0,-1), (-1,-1), 1, c_secondary), ('FONTNAME', (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR', (0,-1), (-1,-1), c_secondary), ('BACKGROUND', (0,-1), (-1,-1), c_zebra),
+    ]))
+    story.append(t_resumen)
+
+    def tabla_estandar(data, col_widths, color_header, align_derecha=None):
+        estilo = [('BACKGROUND', (0,0), (-1,0), color_header), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                  ('GRID', (0,0), (-1,-1), 0.5, c_line), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, c_zebra]),
+                  ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 8),
+                  ('BOTTOMPADDING', (0,0), (-1,-1), 4), ('TOPPADDING', (0,0), (-1,-1), 4)]
+        if align_derecha:
+            for col in align_derecha:
+                estilo.append(('ALIGN', (col,1), (col,-1), 'RIGHT'))
+        t = Table(data, colWidths=col_widths)
+        t.setStyle(TableStyle(estilo))
+        return t
+
+    story.append(Paragraph("1 · FASE 1 — HONORARIOS Y PROPUESTA COMERCIAL", sub_style))
     if not df_hon.empty:
-        tot_hon = df_hon["base_imponible"].sum()
         data_h = [["Fase / Servicio", "Base (€)", "Total (€)", "Estado"]]
         for _, r in df_hon.iterrows():
             data_h.append([Paragraph(r["fase"], n_style), f"{r['base_imponible']:,.2f}", f"{r['total_a_cobrar']:,.2f}", r["estado"]])
-        t_h = Table(data_h, colWidths=[200, 80, 80, 150])
-        t_h.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), c_primary), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#C9C4B8")), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F6F4EE")]), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 8), ('ALIGN', (1,1), (2,-1), 'RIGHT'), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3)]))
-        story.append(t_h)
+        story.append(tabla_estandar(data_h, [200, 80, 80, 150], c_primary, align_derecha=[1,2]))
         story.append(Spacer(1, 3))
-        story.append(Paragraph(f"<b>Base Total Acumulada en Honorarios:</b> {tot_hon:,.2f} €", n_bold))
+        story.append(Paragraph(f"Base total acumulada en honorarios: <b>{tot_hon:,.2f} €</b>", n_style))
     else:
-        story.append(Paragraph("Sin honorarios registrados.", n_style))
- 
-    story.append(Paragraph("2. FASE 2 - Gestión Municipal y Tasas", sub_style))
+        story.append(Paragraph("Sin honorarios registrados.", n_muted))
+
+    story.append(Paragraph("2 · FASE 2 — GESTIÓN MUNICIPAL Y TASAS", sub_style))
     if not df_tra.empty:
-        tot_tasas = df_tra["tasas_euros"].sum()
-        data_t = [["Organismo", "Tipo de Trámite", "Nº Exp", "Tasas (€)", "Estado"]]
+        data_t = [["Organismo", "Tipo de Trámite", "Nº Exp.", "Tasas (€)", "Estado"]]
         for _, r in df_tra.iterrows():
             data_t.append([Paragraph(r["organismo"], n_style), Paragraph(r["tipo_tramite"], n_style), r["num_expediente"], f"{r['tasas_euros']:,.2f}", r["estado"]])
-        t_t = Table(data_t, colWidths=[130, 140, 80, 70, 90])
-        t_t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), c_secondary), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#C9C4B8")), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F6F4EE")]), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 8), ('ALIGN', (3,1), (3,-1), 'RIGHT'), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3)]))
-        story.append(t_t)
+        story.append(tabla_estandar(data_t, [130, 140, 80, 70, 90], c_secondary, align_derecha=[3]))
         story.append(Spacer(1, 3))
-        story.append(Paragraph(f"<b>Total Tasas e Impuestos Abonados:</b> {tot_tasas:,.2f} €", n_bold))
+        story.append(Paragraph(f"Total tasas e impuestos abonados: <b>{tot_tasas:,.2f} €</b>", n_style))
     else:
-        story.append(Paragraph("Sin trámites registrados.", n_style))
- 
-    story.append(Paragraph("3. FASE 3 - Contratas y Licitación", sub_style))
-    story.append(Paragraph(f"Presupuesto de Ejecución de Contrata (PEC Asignado): <b>{datos_obra['presupuesto_total']:,.2f} €</b>", n_style))
+        story.append(Paragraph("Sin trámites registrados.", n_muted))
+
+    story.append(Paragraph("3 · FASE 3 — CONTRATAS Y LICITACIÓN", sub_style))
+    story.append(Paragraph(f"Presupuesto de Ejecución de Contrata (PEC asignado): <b>{tot_pec:,.2f} €</b>", n_style))
     if not df_lic.empty:
+        story.append(Spacer(1, 4))
         data_l = [["Capítulo / Paquete", "PEM Est. (€)", "Empresa Adjudicataria", "Importe Adjudicado (€)"]]
         for _, r in df_lic.iterrows():
             data_l.append([Paragraph(r["capitulo"], n_style), f"{r['presupuesto_estimado']:,.2f}", Paragraph(r["empresa_adjudicada"], n_style), f"{r['monto_adjudicado']:,.2f}"])
-        t_l = Table(data_l, colWidths=[170, 85, 125, 130])
-        t_l.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), c_primary), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#C9C4B8")), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F6F4EE")]), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 8), ('ALIGN', (1,1), (1,-1), 'RIGHT'), ('ALIGN', (3,1), (3,-1), 'RIGHT'), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3)]))
-        story.append(t_l)
- 
-    story.append(Paragraph("4. FASE 4 - Ejecución y Certificaciones", sub_style))
+        story.append(tabla_estandar(data_l, [170, 85, 125, 130], c_primary, align_derecha=[1,3]))
+    else:
+        story.append(Paragraph("Sin paquetes de licitación adjudicados.", n_muted))
+
+    story.append(Paragraph("4 · FASE 4 — EJECUCIÓN Y CERTIFICACIONES", sub_style))
     if not df_cer.empty:
-        tot_cer = df_cer["importe_bruto"].sum()
         data_c = [["Nº", "Periodo", "Importe Bruto (€)", "Ret. 5% (€)", "Líquido (€)", "Estado"]]
         for _, r in df_cer.iterrows():
             data_c.append([f"#{r['num_certificacion']}", r["mes_ano"], f"{r['importe_bruto']:,.2f}", f"{r['retencion_5pct']:,.2f}", f"{r['liquido_pagar']:,.2f}", r["estado"]])
-        t_c = Table(data_c, colWidths=[25, 100, 95, 80, 90, 120])
-        t_c.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), c_secondary), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke), ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor("#C9C4B8")), ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, colors.HexColor("#F6F4EE")]), ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'), ('FONTSIZE', (0,0), (-1,-1), 8), ('ALIGN', (2,1), (4,-1), 'RIGHT'), ('BOTTOMPADDING', (0,0), (-1,-1), 3), ('TOPPADDING', (0,0), (-1,-1), 3)]))
-        story.append(t_c)
+        story.append(tabla_estandar(data_c, [25, 100, 95, 80, 90, 120], c_secondary, align_derecha=[2,3,4]))
         story.append(Spacer(1, 3))
-        story.append(Paragraph(f"<b>Total Certificado a Origen:</b> {tot_cer:,.2f} €", n_bold))
+        pct_avance = (tot_cer / tot_pec * 100) if tot_pec > 0 else 0.0
+        story.append(Paragraph(f"Total certificado a origen: <b>{tot_cer:,.2f} €</b> &nbsp;&nbsp;|&nbsp;&nbsp; Avance sobre PEC: <b>{pct_avance:,.1f}%</b>", n_style))
     else:
-        story.append(Paragraph("Sin certificaciones de obra emitidas.", n_style))
- 
+        story.append(Paragraph("Sin certificaciones de obra emitidas.", n_muted))
+
+    story.append(Paragraph("5 · FASE 5 — CIERRE, FINIQUITO Y GARANTÍA", sub_style))
+    if cierre_row is not None and len(cierre_row) > 0:
+        cr = cierre_row
+        data_z = [
+            ["Certificado Final de Obra (CFO)", cr.get('fecha_cfo') or "Pendiente"],
+            ["Acta de Recepción", cr.get('fecha_acta_recepcion') or "Pendiente"],
+            ["Estado del cierre", cr.get('estado_cierre') or "En curso"],
+            ["Retención del 5% devuelta", cr.get('retencion_devuelta') or "No"],
+            ["Fecha de devolución de retención", cr.get('fecha_devolucion_retencion') or "—"],
+        ]
+        t_z = Table(data_z, colWidths=[260, 220])
+        t_z.setStyle(TableStyle([('GRID', (0,0), (-1,-1), 0.5, c_line), ('FONTSIZE', (0,0), (-1,-1), 8.5),
+                                  ('BACKGROUND', (0,0), (0,-1), c_zebra), ('FONTNAME', (0,0), (0,-1), 'Helvetica-Bold'),
+                                  ('TOPPADDING', (0,0), (-1,-1), 4), ('BOTTOMPADDING', (0,0), (-1,-1), 4)]))
+        story.append(t_z)
+        if cr.get('observaciones'):
+            story.append(Spacer(1, 4))
+            story.append(Paragraph(f"<b>Observaciones:</b> {cr.get('observaciones')}", n_style))
+    else:
+        story.append(Paragraph("Obra en curso: el cierre, finiquito y periodo de garantía se documentarán al finalizar la ejecución.", n_muted))
+
+    story.append(Spacer(1, 22))
+    story.append(Paragraph("_" * 40, n_center))
+    story.append(Paragraph("Luciano I. Leguizamón — Arquitecto · COAC nº 85.582", ParagraphStyle("Firma", parent=n_center, fontName="Helvetica-Bold", spaceBefore=2)))
+    story.append(Paragraph("Documento generado automáticamente por el sistema de gestión de obra. Los importes son informativos y están sujetos a las certificaciones y contratos originales firmados.", n_muted))
+
     doc.build(story, onFirstPage=dibujar_membrete_corporativo, onLaterPages=dibujar_membrete_corporativo)
     buffer.seek(0)
     return buffer
- 
+
+
 def generar_propuesta_pdf(datos_obra, df_honorarios):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -318,14 +424,14 @@ def generar_propuesta_pdf(datos_obra, df_honorarios):
     titulo_style = ParagraphStyle("Titulo", parent=styles["Heading1"], fontSize=18, textColor=colors.HexColor("#1A1C1D"), spaceAfter=10, alignment=1)
     subtitulo_style = ParagraphStyle("Subtitulo", parent=styles["Heading2"], fontSize=13, textColor=colors.HexColor("#7C5A38"), spaceAfter=6)
     normal_style = styles["Normal"]
- 
+
     story.append(Paragraph("PROPUESTA DE SERVICIOS PROFESIONALES", titulo_style))
     story.append(Spacer(1, 15))
     story.append(Paragraph(f"<b>Referencia de Proyecto:</b> {datos_obra['codigo']} - {datos_obra['nombre']}", normal_style))
     story.append(Paragraph(f"<b>Fecha de Propuesta:</b> {datetime.now().strftime('%d/%m/%Y')}", normal_style))
     story.append(Paragraph(f"<b>Presupuesto Estimado de Ejecución Material (PEM):</b> {datos_obra['presupuesto_total']:,.2f} €", normal_style))
     story.append(Spacer(1, 20))
- 
+
     story.append(Paragraph("1. Desglose de Honorarios y Servicios", subtitulo_style))
     if not df_honorarios.empty:
         data_hon = [["Fase de Trabajo / Servicio", "Base Imponible", "IVA", "IRPF", "Total a Abonar"]]
@@ -350,7 +456,7 @@ def generar_propuesta_pdf(datos_obra, df_honorarios):
     doc.build(story)
     buffer.seek(0)
     return buffer
- 
+
 def generar_informe_coac_pdf(nombre_obra, codigo_obra, cliente, municipio, sup, pem, honorarios, porc, cu):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=1.5*cm, leftMargin=1.5*cm, topMargin=1.5*cm, bottomMargin=3*cm)
@@ -360,7 +466,7 @@ def generar_informe_coac_pdf(nombre_obra, codigo_obra, cliente, municipio, sup, 
     style_body = ParagraphStyle('DocBody', parent=styles['Normal'], fontSize=9.5, leading=13.5)
     style_body_bold = ParagraphStyle('DocBodyBold', parent=style_body, fontName='Helvetica-Bold')
     eur = lambda v: f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") + " €"
- 
+
     def dibujar_pie_pagina(canvas, doc):
         canvas.saveState()
         canvas.setFont('Helvetica', 9)
@@ -371,13 +477,13 @@ def generar_informe_coac_pdf(nombre_obra, codigo_obra, cliente, municipio, sup, 
         canvas.drawRightString(doc.width + doc.leftMargin, 1.8*cm, "Firma del Profesional: ________________________________")
         canvas.drawCentredString(A4[0]/2, 1*cm, f"Página {doc.page}")
         canvas.restoreState()
- 
+
     contenido = [Paragraph("INFORME DE VALORACIÓN ECONÓMICA (COAC)", style_title), Spacer(1, 4)]
     t_line = Table([[""]], colWidths=[530], rowHeights=[2])
     t_line.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), colors.HexColor('#1A1C1D'))]))
     contenido.append(t_line)
     contenido.append(Spacer(1, 15))
- 
+
     datos_bloque = [
         [Paragraph("<b>DATOS DEL ENCARGO</b>", style_body_bold), Paragraph("<b>PARÁMETROS DE CÁLCULO</b>", style_body_bold)],
         [Paragraph(f"<b>Proyecto:</b> {nombre_obra}", style_body), Paragraph(f"<b>Superficie:</b> {sup:,.1f} m²", style_body)],
@@ -389,7 +495,7 @@ def generar_informe_coac_pdf(nombre_obra, codigo_obra, cliente, municipio, sup, 
     t_datos.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'TOP'), ('LEFTPADDING', (0,0), (-1,-1), 0)]))
     contenido.append(t_datos)
     contenido.append(Spacer(1, 15))
- 
+
     pec_estimado = pem * 1.19
     iva = honorarios * 0.21
     total = honorarios + iva
@@ -406,11 +512,11 @@ def generar_informe_coac_pdf(nombre_obra, codigo_obra, cliente, municipio, sup, 
     t_fin.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1A1C1D')), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('ALIGN', (1,1), (1,-1), 'RIGHT'), ('BOTTOMPADDING', (0,0), (-1,-1), 6)]))
     contenido.append(t_fin)
     contenido.append(Spacer(1, 15))
- 
+
     doc.build(contenido, onFirstPage=dibujar_pie_pagina, onLaterPages=dibujar_pie_pagina)
     buffer.seek(0)
     return buffer
- 
+
 def generar_informe_tecnico_pdf(datos_obra, ing_row):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=30, leftMargin=30, topMargin=30, bottomMargin=30)
@@ -430,12 +536,12 @@ def generar_informe_tecnico_pdf(datos_obra, ing_row):
     doc.build(story)
     buffer.seek(0)
     return buffer
- 
+
 # --- GESTIÓN DE ESTADO Y PANTALLA DE LOGIN ---
 if "app_iniciada" not in st.session_state: st.session_state["app_iniciada"] = False
 if "rol_usuario" not in st.session_state: st.session_state["rol_usuario"] = None
 if "obra_asignada" not in st.session_state: st.session_state["obra_asignada"] = None
- 
+
 if not st.session_state["app_iniciada"] or st.session_state["rol_usuario"] is None:
     col_l1, col_l2, col_l3 = st.columns([1, 1.2, 1])
     with col_l2:
@@ -446,9 +552,9 @@ if not st.session_state["app_iniciada"] or st.session_state["rol_usuario"] is No
                 st.image(logo_path, width=180)
             else:
                 st.markdown("<h1 style='color: var(--cream-on-dark); text-align: center; font-family: var(--serif);'>Luciano I. Leguizamón</h1>", unsafe_allow_html=True)
- 
+
         st.markdown("<p class='brand-eyebrow'>Portal de obra · Acceso privado</p>", unsafe_allow_html=True)
- 
+
         with st.container(border=True):
             with st.form("login_form"):
                 usr = st.text_input("Usuario")
@@ -464,25 +570,25 @@ if not st.session_state["app_iniciada"] or st.session_state["rol_usuario"] is No
                     else:
                         st.error("Credenciales incorrectas")
     st.stop()
- 
+
 rol = st.session_state["rol_usuario"]
- 
+
 # --- BARRA LATERAL ---
 logo_path = "logo_estudio.png"
 if os.path.exists(logo_path):
     st.sidebar.image(logo_path, use_container_width=True)
 else:
     st.sidebar.markdown("<h3 style='text-align: center; color: var(--cream-on-dark); font-family: var(--serif);'>Luciano I. Leguizamón</h3>", unsafe_allow_html=True)
- 
+
 if st.sidebar.button("Cerrar Sesión", use_container_width=True):
     st.session_state["app_iniciada"] = False
     st.session_state["rol_usuario"] = None
     st.session_state["obra_asignada"] = None
     st.rerun()
- 
+
 st.sidebar.markdown(f"**Perfil Activo:** {rol}")
 st.sidebar.divider()
- 
+
 if rol == "Arquitecto":
     with st.sidebar.expander("Crear Nuevo Proyecto"):
         with st.form("form_nueva_obra", clear_on_submit=True):
@@ -496,28 +602,28 @@ if rol == "Arquitecto":
                     st.rerun()
                 except sqlite3.IntegrityError:
                     st.sidebar.error("Ya existe un proyecto con ese nombre.")
- 
+
 # === FILTRO DINÁMICO DE OBRAS ===
 if rol == "Arquitecto":
     obras_df = pd.read_sql_query("SELECT * FROM obras", conn)
 else:
     obra_id_permitida = st.session_state["obra_asignada"]
     obras_df = pd.read_sql_query("SELECT * FROM obras WHERE id = ?", conn, params=(obra_id_permitida,))
- 
+
 if obras_df.empty:
     st.info("No hay obras disponibles para tu usuario.")
     st.stop()
- 
+
 opciones_obras = {f"{row['codigo']} - {row['nombre']}": row['id'] for _, row in obras_df.iterrows()}
 obra_seleccionada_txt = st.sidebar.selectbox("Proyecto Activo:", list(opciones_obras.keys()))
 obra_id_activa = opciones_obras[obra_seleccionada_txt]
 datos_obra = obras_df[obras_df['id'] == obra_id_activa].iloc[0]
- 
+
 sup_guardada = float(datos_obra.get('superficie_construida', 120.0))
 if pd.isna(sup_guardada): sup_guardada = 120.0
 hon_guardados = float(datos_obra.get('honorarios_base', 12000.0))
 if pd.isna(hon_guardados): hon_guardados = 12000.0
- 
+
 if rol == "Arquitecto":
     with st.sidebar.expander("Modificar Datos y Estado de Archivo"):
         with st.form("form_editar_obra"):
@@ -532,7 +638,7 @@ if rol == "Arquitecto":
                 cursor.execute("UPDATE obras SET nombre = ?, codigo = ?, presupuesto_total = ?, estado_expediente = ? WHERE id = ?", (edit_nombre_obra, edit_codigo_obra, edit_presupuesto_base, edit_estado_exp, obra_id_activa))
                 conn.commit()
                 st.rerun()
- 
+
     with st.sidebar.expander("Gestión de Accesos (Clientes/Constructores)"):
         st.write(f"Dar acceso a: **{datos_obra['nombre']}**")
         with st.form("form_accesos", clear_on_submit=True):
@@ -547,7 +653,7 @@ if rol == "Arquitecto":
                         st.sidebar.success("Usuario creado.")
                     except sqlite3.IntegrityError:
                         st.sidebar.error("El nombre de usuario ya existe.")
- 
+
     with st.sidebar.expander("Calculadora COAC Express", expanded=False):
         st.caption(f"Módulo Básico COAC: **{MODULO_BASICO_COAC} €/m²**")
         c_sup = st.number_input("Superficie Construida (m²):", min_value=1.0, value=sup_guardada, step=10.0, key="coac_sup")
@@ -564,12 +670,12 @@ if rol == "Arquitecto":
         porc_hon_coac = 0.12 if pem_coac_calc < 50000 else 0.10
         hon_coac_calc = pem_coac_calc * porc_hon_coac
         pec_coac_calc = pem_coac_calc * 1.19
- 
+
         st.markdown("---")
         st.write(f"**PEM Estimado:** `{pem_coac_calc:,.2f} €`")
         st.write(f"**PEC Contrata (19%):** `{pec_coac_calc:,.2f} €`")
         st.success(f"**Honorarios ({int(porc_hon_coac*100)}%):** {hon_coac_calc:,.2f} €")
- 
+
         col_btn_c1, col_btn_c2 = st.columns(2)
         with col_btn_c1:
             if st.button("Aplicar PEC", use_container_width=True):
@@ -579,7 +685,7 @@ if rol == "Arquitecto":
         with col_btn_c2:
             pdf_coac_bytes = generar_informe_coac_pdf(datos_obra["nombre"], datos_obra["codigo"], "D. Cliente Promotor", "Cataluña", c_sup, pem_coac_calc, hon_coac_calc, porc_hon_coac, cu_val)
             st.download_button(label="PDF COAC", data=pdf_coac_bytes, file_name=f"Valoracion_COAC_{datos_obra['codigo']}.pdf", mime="application/pdf", use_container_width=True)
- 
+
 # --- CONSULTAS DE DATOS ---
 df_honorarios = pd.read_sql_query("SELECT * FROM honorarios WHERE obra_id = ?", conn, params=(obra_id_activa,))
 df_tramites = pd.read_sql_query("SELECT * FROM tramites WHERE obra_id = ?", conn, params=(obra_id_activa,))
@@ -592,7 +698,7 @@ df_cierre = pd.read_sql_query("SELECT * FROM cierre_obra WHERE obra_id = ?", con
 df_posventa = pd.read_sql_query("SELECT * FROM posventa WHERE obra_id = ? ORDER BY id DESC", conn, params=(obra_id_activa,))
 df_ing = pd.read_sql_query("SELECT * FROM ingenieria_datos WHERE obra_id = ?", conn, params=(obra_id_activa,))
 df_anteproyectos = pd.read_sql_query("SELECT * FROM anteproyectos WHERE obra_id = ? ORDER BY id DESC", conn, params=(obra_id_activa,))
- 
+
 total_previsto = df_gantt["coste_estimado"].sum() if not df_gantt.empty else 0.0
 total_fisico_euros = (df_gantt["coste_estimado"] * (df_gantt["avance_porcentaje"] / 100.0)).sum() if not df_gantt.empty else 0.0
 pct_fisico_global = (total_fisico_euros / total_previsto * 100) if total_previsto > 0 else 0.0
@@ -604,7 +710,7 @@ pendiente_certificar = max(0.0, total_fisico_euros - total_cert_bruto)
 total_honorarios_base = df_honorarios["base_imponible"].sum() if not df_honorarios.empty else 0.0
 total_tasas_pagadas = df_tramites["tasas_euros"].sum() if not df_tramites.empty else 0.0
 inversion_total_cliente = datos_obra["presupuesto_total"] + total_honorarios_base + total_tasas_pagadas
- 
+
 # --- CABECERA PRINCIPAL Y ÚNICO BOTÓN MAESTRO DE DESCARGA ---
 col_head1, col_head2 = st.columns([3, 1])
 with col_head1:
@@ -614,17 +720,17 @@ with col_head1:
         st.caption(f"Ref: {datos_obra['codigo']} | Estado: **{est_exp}** | Inversión Total Cliente: **{inversion_total_cliente:,.2f} €** (Obra: {datos_obra['presupuesto_total']:,.0f} € + Honorarios: {total_honorarios_base:,.0f} € + Tasas: {total_tasas_pagadas:,.0f} €)")
     else:
         st.caption(f"Ref: {datos_obra['codigo']} | Estado: **{est_exp}** | Presupuesto Ejecución: **{datos_obra['presupuesto_total']:,.0f} €**")
- 
+
 with col_head2:
     st.write("")
     cierre_row_obj = df_cierre.iloc[0] if not df_cierre.empty else None
     if rol == "Arquitecto":
         pdf_maestro = generar_expediente_maestro_pdf(datos_obra, df_honorarios, df_tramites, df_licit, df_cert, cierre_row_obj)
         st.download_button("Descargar Expediente Maestro (PDF)", pdf_maestro, file_name=f"Expediente_Maestro_{datos_obra['codigo']}.pdf", mime="application/pdf", use_container_width=True)
- 
+
 if est_exp != "En Curso / Activo" and rol == "Arquitecto":
     st.warning(f"**EXPEDIENTE ARCHIVADO:** Este encargo se encuentra en estado *'{est_exp}'*. Las nuevas modificaciones están bloqueadas.")
- 
+
 # ==========================================
 # ESTRUCTURA POR 5 FASES CRONOLÓGICAS
 # ==========================================
@@ -635,7 +741,7 @@ tab_fase1, tab_fase2, tab_fase3, tab_fase4, tab_fase5 = st.tabs([
     "FASE 4: Ejecución y Dirección de Obra",
     "FASE 5: Cierre, Finiquito y Posventa"
 ])
- 
+
 # ---------------------------------------------------------
 # FASE 1
 # ---------------------------------------------------------
@@ -660,7 +766,7 @@ with tab_fase1:
             titulo_buzon = "BANDEJA DE MENSAJES (NUEVO AVISO)"
         else:
             titulo_buzon = "Bandeja de Mensajes y Avisos del Expediente"
- 
+
         # 4. Creamos el Expander (Cerrado por defecto con expanded=False)
         with st.expander(titulo_buzon, expanded=False):
             
@@ -699,7 +805,7 @@ with tab_fase1:
                                    (obra_id_activa, fecha_hoy, rol, nuevo_msg))
                     conn.commit()
                     st.rerun()
- 
+
             # --- AVISOS EXTERNOS (Elegantes y pequeños) ---
             if rol == "Arquitecto":
                 import urllib.parse
@@ -713,7 +819,7 @@ with tab_fase1:
                 with col_mail:
                     st.markdown(f'<a href="mailto:?subject=Actualización Proyecto {datos_obra["codigo"]}&body={msg_codificado}" target="_blank" style="text-decoration:none;"><button style="width:100%; padding:5px; background-color:#1E293B; color:#D44638; border:1px solid #2d2d2d; border-radius:4px; font-weight:bold; cursor:pointer; font-size:13px;">Email</button></a>', unsafe_allow_html=True)
                 st.write("")
- 
+
     
     st.markdown("### Fase 1: Viabilidad, Anteproyecto y Honorarios")
     if rol == "Arquitecto":
@@ -725,7 +831,7 @@ with tab_fase1:
             val_irpf_previo = 0.0
             if visita_existente and float(visita_existente[1]) > 0:
                 val_irpf_previo = round((float(visita_existente[3]) / float(visita_existente[1])) * 100, 1)
- 
+
             with st.form("form_viabilidad"):
                 col_v1, col_v2, col_v3 = st.columns(3)
                 with col_v1: coste_visita = st.number_input("Coste Primera Visita / Viabilidad (€):", min_value=0.0, step=50.0, value=valor_visita_actual)
@@ -742,7 +848,7 @@ with tab_fase1:
                         cursor.execute("INSERT INTO honorarios (obra_id, fase, porcentaje, base_imponible, iva, retencion_irpf, total_a_cobrar, estado, fecha_emision, fecha_cobro) VALUES (?, ?, 0.0, ?, ?, ?, ?, 'Cobrado', ?, ?)", (obra_id_activa, "00. Visita Inicial y Viabilidad", coste_visita, iva, irpf, total, str(date.today()), str(date.today())))
                     conn.commit()
                     st.rerun()
- 
+
     if rol in ["Arquitecto", "Cliente"]:
         with st.expander("1.2 Presentación de Anteproyecto (Visor Seguro)", expanded=False):
             if rol == "Arquitecto":
@@ -757,7 +863,7 @@ with tab_fase1:
                             cursor.execute("INSERT INTO anteproyectos (obra_id, titulo, archivo_path, fecha) VALUES (?, ?, ?, ?)", (obra_id_activa, titulo_ant, ruta_ant, str(date.today())))
                             conn.commit()
                             st.rerun()
- 
+
             if not df_anteproyectos.empty:
                 st.markdown("#### Propuestas Presentadas")
                 if rol == "Arquitecto" and est_exp == "En Curso / Activo":
@@ -787,7 +893,7 @@ with tab_fase1:
                         else:
                             st.image(ruta_arch, width="stretch")
                     st.divider()
- 
+
     if rol == "Arquitecto":
         with st.expander("1.3 Archivos y Datos Técnicos (Geotecnia y Estructuras)", expanded=False):
             ing_row = df_ing.iloc[0] if not df_ing.empty else None
@@ -796,7 +902,7 @@ with tab_fase1:
             val_coste_geo = float(ing_row["coste_geotecnico"]) if (ing_row is not None and pd.notna(ing_row["coste_geotecnico"])) else 950.0
             val_obs_geo = str(ing_row["observaciones"]) if (ing_row is not None and pd.notna(ing_row["observaciones"])) else ""
             val_coste_est = float(ing_row["coste_estructuras"]) if (ing_row is not None and pd.notna(ing_row["coste_estructuras"])) else 1500.0
- 
+
             with st.form("form_estudios_tecnicos"):
                 col_geo, col_est = st.columns(2)
                 with col_geo:
@@ -807,13 +913,13 @@ with tab_fase1:
                     coste_geo = st.number_input("Coste Estudio Geotécnico (€):", min_value=0.0, step=50.0, value=val_coste_geo)
                     obs_geo = st.text_area("Conclusiones Geotécnicas:", value=val_obs_geo)
                     file_geo = st.file_uploader("Adjuntar PDF Geotécnico:", type=["pdf"])
- 
+
                 with col_est:
                     st.markdown("#### Cálculo de Estructuras")
                     realizado_por = st.selectbox("Realizado por:", ["Estudio Propio (Interno)", "Ingeniería Externa", "Constructora"], index=0)
                     coste_est = st.number_input("Coste Cálculo Estructural (€):", min_value=0.0, step=100.0, value=val_coste_est)
                     file_est = st.file_uploader("Adjuntar PDF Estructuras:", type=["pdf"])
- 
+
                 if st.form_submit_button("Guardar Datos y Archivos Técnicos") and est_exp == "En Curso / Activo":
                     ruta_geo = ing_row["archivo_geo"] if (ing_row is not None and pd.notna(ing_row["archivo_geo"])) else ""
                     if file_geo:
@@ -823,14 +929,14 @@ with tab_fase1:
                     if file_est:
                         ruta_est = os.path.join(UPLOAD_DIR, f"EST_{datos_obra['codigo']}_{file_est.name}".replace(" ", "_"))
                         with open(ruta_est, "wb") as f: f.write(file_est.getbuffer())
- 
+
                     if ing_row is None:
                         cursor.execute("INSERT INTO ingenieria_datos (obra_id, tipo_terreno, tension_adm, nivel_freatico, sismicidad, observaciones, coste_geotecnico, archivo_geo, realizado_por_est, coste_estructuras, archivo_est) VALUES (?, ?, ?, ?, 'Baja', ?, ?, ?, ?, ?, ?)", (obra_id_activa, tipo_terreno, sigma_adm, nivel_freatico, obs_geo, coste_geo, ruta_geo, realizado_por, coste_est, ruta_est))
                     else:
                         cursor.execute("UPDATE ingenieria_datos SET tipo_terreno=?, tension_adm=?, nivel_freatico=?, observaciones=?, coste_geotecnico=?, archivo_geo=?, realizado_por_est=?, coste_estructuras=?, archivo_est=? WHERE obra_id=?", (tipo_terreno, sigma_adm, nivel_freatico, obs_geo, coste_geo, ruta_geo, realizado_por, coste_est, ruta_est, obra_id_activa))
                     conn.commit()
                     st.rerun()
- 
+
             if ing_row is not None:
                 st.markdown("---")
                 st.markdown("##### Archivos e Informes Técnicos")
@@ -844,7 +950,7 @@ with tab_fase1:
                 with col_f3:
                     pdf_tecnico = generar_informe_tecnico_pdf(datos_obra, ing_row)
                     st.download_button(label="Generar Memoria Técnica (PDF)", data=pdf_tecnico, file_name=f"Memoria_Tecnica_{datos_obra['codigo']}.pdf", mime="application/pdf")
- 
+
         # 1.4 HONORARIOS
         st.markdown("### 1.4 Honorarios y Propuesta Comercial")
         if not df_honorarios.empty:
@@ -852,14 +958,14 @@ with tab_fase1:
             cobrado_base = df_honorarios[df_honorarios["estado"] == "Cobrado"]["base_imponible"].sum()
             pendiente_cobro = total_hon_base - cobrado_base
             cobrado_total_facturas = df_honorarios[df_honorarios["estado"] == "Cobrado"]["total_a_cobrar"].sum()
- 
+
             h1, h2, h3 = st.columns(3)
             h1.metric("Honorarios Totales (Base)", f"{total_hon_base:,.2f} €")
             h2.metric("Total Cobrado (c/Impuestos)", f"{cobrado_total_facturas:,.2f} €")
             h3.metric("Pendiente de Cobro", f"{pendiente_cobro:,.2f} €", delta=f"{-pendiente_cobro:,.2f} €")
             
             st.divider()
- 
+
         col_h_gen, col_h_man = st.columns(2)
         with col_h_gen:
             if est_exp == "En Curso / Activo":
@@ -867,19 +973,19 @@ with tab_fase1:
                     cursor.execute("SELECT base_imponible FROM honorarios WHERE obra_id = ? AND fase = '00. Visita Inicial y Viabilidad'", (obra_id_activa,))
                     r_vis = cursor.fetchone()
                     anticipo_visita = float(r_vis[0]) if r_vis else 0.0
- 
+
                     with st.form("form_auto_honorarios"):
                         hon_total_input = st.number_input("Base Estimada Proyecto Completo (€):", min_value=500.0, step=500.0, value=float(hon_guardados))
                         c_tax1, c_tax2 = st.columns(2)
                         with c_tax1: pct_iva = st.selectbox("% IVA:", [21, 10, 0], index=0)
                         with c_tax2: pct_irpf = st.number_input("% Retención IRPF:", min_value=0.0, max_value=35.0, value=0.0, step=1.0)
- 
+
                         st.markdown("**Selecciona las fases a contratar ahora:**")
                         inc_f1 = st.checkbox("01. Estudios Previos y Anteproyecto (15%)", value=True)
                         inc_f2 = st.checkbox("02. Proyecto Básico - Licencia (20%)", value=True)
                         inc_f3 = st.checkbox("03. Proyecto Ejecutivo y Arquitectura (30%)", value=False)
                         inc_f4 = st.checkbox("04. Dirección de Obra y Liquidación Final (35%)", value=False)
- 
+
                         st.markdown("**Servicios Adicionales**")
                         def_coste_geo = float(ing_row["coste_geotecnico"]) if (ing_row is not None and pd.notna(ing_row["coste_geotecnico"])) else 950.0
                         def_coste_est = float(ing_row["coste_estructuras"]) if (ing_row is not None and pd.notna(ing_row["coste_estructuras"])) else 1500.0
@@ -887,7 +993,7 @@ with tab_fase1:
                         coste_geo_hon = st.number_input("Cobro Estudio Geotécnico (€):", value=def_coste_geo) if inc_geo else 0.0
                         inc_est = st.checkbox("06. Cálculo de Estructuras", value=False)
                         coste_est_hon = st.number_input("Cobro Cálculo Estructural (€):", value=def_coste_est) if inc_est else 0.0
- 
+
                         if st.form_submit_button("Generar / Actualizar Fases Seleccionadas"):
                             cursor.execute("UPDATE obras SET honorarios_base = ? WHERE id = ?", (hon_total_input, obra_id_activa))
                             cursor.execute("DELETE FROM honorarios WHERE obra_id = ? AND (fase LIKE '01.%' OR fase LIKE '02.%' OR fase LIKE '03.%' OR fase LIKE '04.%' OR fase LIKE '05.%' OR fase LIKE '06.%')", (obra_id_activa,))
@@ -898,7 +1004,7 @@ with tab_fase1:
                             if inc_f4: fases_a_incluir.append(("04. Dirección de Obra y Liquidación Final", 35.0, hon_total_input * 0.35))
                             if inc_geo: fases_a_incluir.append(("05. Gestión Estudio Geotécnico", 0.0, coste_geo_hon))
                             if inc_est: fases_a_incluir.append(("06. Cálculo de Estructuras", 0.0, coste_est_hon))
- 
+
                             for nom_fase, pct_fase, base_fase in fases_a_incluir:
                                 iva_fase = round(base_fase * (pct_iva / 100.0), 2)
                                 irpf_fase = round(base_fase * (pct_irpf / 100.0), 2)
@@ -906,7 +1012,7 @@ with tab_fase1:
                                 cursor.execute("INSERT INTO honorarios (obra_id, fase, porcentaje, base_imponible, iva, retencion_irpf, total_a_cobrar, estado, fecha_emision, fecha_cobro) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, nom_fase, pct_fase, base_fase, iva_fase, irpf_fase, total_factura, "Pendiente", "-", "-"))
                             conn.commit()
                             st.rerun()
- 
+
         with col_h_man:
             if not df_honorarios.empty:
                 st.markdown("#### Cuadro de Minutas")
@@ -930,7 +1036,7 @@ with tab_fase1:
                         cursor.execute("DELETE FROM honorarios WHERE id = ?", (id_h_sel,))
                         conn.commit()
                         st.rerun()
- 
+
 # ---------------------------------------------------------
 # FASE 2: GESTIÓN MUNICIPAL Y VISADOS
 # ---------------------------------------------------------
@@ -944,7 +1050,7 @@ with tab_fase2:
         t2.metric("Licencias Concedidas", f"{concedidas}")
         t3.metric("Total Tasas / ICIO Pagadas", f"{total_tasas_pagadas:,.2f} €")
         st.divider()
- 
+
     col_t_form, col_t_edit = st.columns(2)
     with col_t_form:
         if est_exp == "En Curso / Activo" and rol == "Arquitecto":
@@ -963,7 +1069,7 @@ with tab_fase2:
                         cursor.execute("INSERT INTO tramites (obra_id, organismo, tipo_tramite, num_expediente, fecha_solicitud, fecha_limite, tasas_euros, estado, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, organismo, tipo_tramite, num_exp, str(f_solicitud), str(f_limite), tasas, estado_tr, obs_tr))
                         conn.commit()
                         st.rerun()
- 
+
     with col_t_edit:
         if not df_tramites.empty and rol == "Arquitecto":
             with st.expander("Actualizar o Eliminar Expediente"):
@@ -983,11 +1089,11 @@ with tab_fase2:
                         cursor.execute("DELETE FROM tramites WHERE id = ?", (id_tr_sel,))
                         conn.commit()
                         st.rerun()
- 
+
     if not df_tramites.empty:
         st.markdown("#### Historial Administrativo")
         st.dataframe(df_tramites[["id", "organismo", "tipo_tramite", "num_expediente", "fecha_solicitud", "fecha_limite", "tasas_euros", "estado", "observaciones"]], width="stretch")
- 
+
 # ---------------------------------------------------------
 # FASE 3: CONTRATACIÓN Y LICITACIÓN
 # ---------------------------------------------------------
@@ -1005,7 +1111,7 @@ with tab_fase3:
             l2.metric("Total Contratado / Adjudicado", f"{total_adjudicado:,.2f} €")
             l3.metric("Baja / Ahorro Obtenido", f"{ahorro_baja:,.2f} €", delta=ahorro_baja)
             st.divider()
- 
+
         col_lic_c, col_lic_adj = st.columns(2)
         with col_lic_c:
             if est_exp == "En Curso / Activo":
@@ -1026,7 +1132,7 @@ with tab_fase3:
                             cursor.execute("INSERT INTO licitaciones (obra_id, capitulo, presupuesto_estimado, empresa_a, oferta_a, empresa_b, oferta_b, empresa_c, oferta_c, empresa_adjudicada, monto_adjudicado, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, capitulo_lic, pem_estimado, emp_a, ofert_a, emp_b, ofert_b, emp_c, oferta_c, "-", 0.0, "En Estudio"))
                             conn.commit()
                             st.rerun()
- 
+
         with col_lic_adj:
             if not df_licit.empty:
                 with st.expander("Adjudicar Oferta Ganadora"):
@@ -1034,13 +1140,13 @@ with tab_fase3:
                     sel_lic_txt = st.selectbox("Selecciona Paquete:", list(opciones_lic.keys()))
                     id_lic_sel = opciones_lic[sel_lic_txt]
                     r_lic_act = df_licit[df_licit["id"] == id_lic_sel].iloc[0]
- 
+
                     desv_a = ((r_lic_act['oferta_a'] - r_lic_act['presupuesto_estimado']) / r_lic_act['presupuesto_estimado'] * 100) if r_lic_act['presupuesto_estimado'] > 0 else 0
                     desv_b = ((r_lic_act['oferta_b'] - r_lic_act['presupuesto_estimado']) / r_lic_act['presupuesto_estimado'] * 100) if r_lic_act['presupuesto_estimado'] > 0 else 0
                     desv_c = ((r_lic_act['oferta_c'] - r_lic_act['presupuesto_estimado']) / r_lic_act['presupuesto_estimado'] * 100) if r_lic_act['presupuesto_estimado'] > 0 else 0
- 
+
                     st.info(f"**{r_lic_act['empresa_a']}**: {r_lic_act['oferta_a']:,.2f} € ({desv_a:+.1f}%)\n\n**{r_lic_act['empresa_b']}**: {r_lic_act['oferta_b']:,.2f} € ({desv_b:+.1f}%)\n\n**{r_lic_act['empresa_c']}**: {r_lic_act['oferta_c']:,.2f} € ({desv_c:+.1f}%)")
- 
+
                     with st.form("form_adjudicar_lic"):
                         opc_ganador = [f"{r_lic_act['empresa_a']} - {r_lic_act['oferta_a']:,.2f} €", f"{r_lic_act['empresa_b']} - {r_lic_act['oferta_b']:,.2f} €", f"{r_lic_act['empresa_c']} - {r_lic_act['oferta_c']:,.2f} €"]
                         ganador_sel = st.selectbox("Adjudicataria:", opc_ganador)
@@ -1055,18 +1161,18 @@ with tab_fase3:
                             cursor.execute("DELETE FROM licitaciones WHERE id = ?", (id_lic_sel,))
                             conn.commit()
                             st.rerun()
- 
+
         if not df_licit.empty:
             st.markdown("#### Matriz de Licitaciones")
             st.dataframe(df_licit[["id", "capitulo", "presupuesto_estimado", "empresa_a", "oferta_a", "empresa_b", "oferta_b", "empresa_c", "oferta_c", "empresa_adjudicada", "monto_adjudicado", "estado"]], width="stretch")
- 
+
 # ---------------------------------------------------------
 # FASE 4: DIRECCIÓN DE OBRA Y EJECUCIÓN MATERIAL
 # ---------------------------------------------------------
 with tab_fase4:
     st.markdown("### Fase 4: Dirección de Obra y Ejecución")
     subtab_gantt, subtab_cert, subtab_docs, subtab_ordenes = st.tabs(["Cronograma y Curva S", "Certificaciones Mensuales (5% Retención)", "Planos y Entregas (CDE)", "Libro de Órdenes y Fotografías"])
- 
+
     # 4.1 Cronograma y Curva S
     with subtab_gantt:
         if not df_gantt.empty:
@@ -1077,13 +1183,13 @@ with tab_fase4:
             desfase = total_fisico_euros - total_cert_bruto
             g4.metric("Desfase Físico vs. Financiero", f"{desfase:,.2f} €", delta=desfase)
             st.divider()
- 
+
             # --- MÓDULO DE ALERTAS Y AUTOCORRECCIÓN ---
         hoy = str(date.today())
         retrasadas = df_gantt[(df_gantt["fecha_fin"] < hoy) & (df_gantt["avance_porcentaje"] < 100)]
         
         desvio_presupuesto = abs(total_previsto - datos_obra["presupuesto_total"]) > 0.01
- 
+
         if not retrasadas.empty or desvio_presupuesto:
             st.markdown("#### Alertas Críticas de Ejecución")
             if not retrasadas.empty:
@@ -1097,25 +1203,14 @@ with tab_fase4:
                 else:
                     st.warning(f"**Desvío:** Falta programar {-diferencia:,.2f} € para alcanzar el presupuesto base.")
                 
-                # NUEVO: Desglose para identificar el origen del desvío
-                st.markdown("** Origen del coste programado (Desglose por Etapas):**")
-                desglose = df_gantt.groupby("etapa")["coste_estimado"].sum().reset_index()
-                desglose = desglose.sort_values(by="coste_estimado", ascending=False)
-                st.dataframe(desglose, use_container_width=True, hide_index=True)
-                
                 if st.button("Auto-Ajustar Partidas Proporcionalmente al Presupuesto Base"):
                     if total_previsto > 0:
                         factor_escala = datos_obra["presupuesto_total"] / total_previsto
                         cursor.execute("UPDATE cronograma SET coste_estimado = ROUND(coste_estimado * ?, 2) WHERE obra_id = ?", (factor_escala, obra_id_activa))
                         conn.commit()
                         st.rerun()
-                    if total_previsto > 0:
-                        factor_escala = datos_obra["presupuesto_total"] / total_previsto
-                        cursor.execute("UPDATE cronograma SET coste_estimado = ROUND(coste_estimado * ?, 2) WHERE obra_id = ?", (factor_escala, obra_id_activa))
-                        conn.commit()
-                        st.rerun()
         # ------------------------------------------
- 
+
         if est_exp == "En Curso / Activo" and rol == "Arquitecto":
             with st.expander("Certificar % de Avance Físico en Obra (Por Partida)"):
                 if not df_gantt.empty:
@@ -1129,7 +1224,7 @@ with tab_fase4:
                             cursor.execute("UPDATE cronograma SET avance_porcentaje = ? WHERE id = ?", (nuevo_av_fisico, id_partida_sel))
                             conn.commit()
                             st.rerun()
- 
+
             with st.expander("Generador Automático de Cronograma", expanded=df_gantt.empty):
                 with st.form("form_autoplan"):
                     c_auto1, c_auto2, c_auto3 = st.columns(3)
@@ -1155,7 +1250,7 @@ with tab_fase4:
                             cursor.execute("INSERT INTO cronograma (obra_id, etapa, tarea, fecha_inicio, fecha_fin, coste_estimado, avance_porcentaje, responsable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, etapa_m, tarea_m, str(f_ini_calc), str(f_fin_calc), coste_calc, 0, resp_m))
                         conn.commit()
                         st.rerun()
- 
+
             col_crear_gantt, col_editar_gantt = st.columns(2)
             with col_crear_gantt:
                 with st.expander("Añadir Partida Manual"):
@@ -1172,7 +1267,7 @@ with tab_fase4:
                                 cursor.execute("INSERT INTO cronograma (obra_id, etapa, tarea, fecha_inicio, fecha_fin, coste_estimado, avance_porcentaje, responsable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, etapa_man, tarea_man, str(f_inicio_man), str(f_fin_man), coste_man, 0, resp_man))
                                 conn.commit()
                                 st.rerun()
- 
+
             with col_editar_gantt:
                 with st.expander("Editar o Modificar Partida"):
                     if not df_gantt.empty:
@@ -1202,18 +1297,18 @@ with tab_fase4:
                             cursor.execute("DELETE FROM cronograma WHERE id = ?", (id_seleccionado,))
                             conn.commit()
                             st.rerun()
- 
+
         if not df_gantt.empty:
             df_gantt_plot = df_gantt.copy()
             df_gantt_plot["fecha_inicio_plot"] = pd.to_datetime(df_gantt_plot["fecha_inicio"])
             df_gantt_plot["fecha_fin_plot"] = pd.to_datetime(df_gantt_plot["fecha_fin"]) + pd.Timedelta(hours=23, minutes=59, seconds=59)
             df_gantt_plot["Etiqueta_Avance"] = df_gantt_plot.apply(lambda r: f"{r['avance_porcentaje']}% ({(r['coste_estimado'] * r['avance_porcentaje'] / 100.0):,.0f} €)", axis=1)
- 
+
             fig = px.timeline(df_gantt_plot, x_start="fecha_inicio_plot", x_end="fecha_fin_plot", y="tarea", color="etapa", text="Etiqueta_Avance", title="Diagrama de Gantt")
             fig.update_traces(textposition='inside', insidetextanchor='middle')
             fig.update_yaxes(autorange="reversed")
             st.plotly_chart(fig, width="stretch")
- 
+
             st.markdown("#### Curva S: Avance Previsto vs. Certificaciones Oficiales Emitidas")
             df_sorted_gantt = df_gantt_plot.sort_values(by="fecha_fin_plot")
             fechas_previstas = [df_gantt_plot["fecha_inicio_plot"].min()] + list(df_sorted_gantt["fecha_fin_plot"])
@@ -1222,10 +1317,10 @@ with tab_fase4:
             for val in df_sorted_gantt["coste_estimado"]:
                 acum += val
                 acumulado_previsto.append(acum)
- 
+
             fig_curva_s = go.Figure()
             fig_curva_s.add_trace(go.Scatter(x=fechas_previstas, y=acumulado_previsto, mode='lines+markers', name='Planificación Prevista (Curva S)', line=dict(color='#3182CE', width=3, shape='spline'), marker=dict(size=6)))
- 
+
             if not df_cert.empty:
                 df_cert_plot = df_cert.copy()
                 df_cert_plot["fecha_dt"] = pd.to_datetime(df_cert_plot["fecha_aprobacion"])
@@ -1237,12 +1332,12 @@ with tab_fase4:
                     acum_c += val_c
                     acumulado_cert.append(acum_c)
                 fig_curva_s.add_trace(go.Scatter(x=fechas_cert, y=acumulado_cert, mode='lines+markers', name='Certificado Real Oficial', line=dict(color='#38A169', width=3.5), marker=dict(size=8, symbol='diamond')))
- 
+
             fig_curva_s.add_hline(y=datos_obra["presupuesto_total"], line_dash="dash", line_color="#E53E3E", annotation_text=f"Presupuesto Contratado: {datos_obra['presupuesto_total']:,.0f} €", annotation_position="bottom right")
             fig_curva_s.update_layout(height=380, xaxis_title="Línea Temporal del Proyecto", yaxis_title="Euros Acumulados (€)", hovermode="x unified", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_curva_s, use_container_width=True)
             st.dataframe(df_gantt[["id", "etapa", "tarea", "responsable", "fecha_inicio", "fecha_fin", "coste_estimado", "avance_porcentaje"]], use_container_width=True)
- 
+
     # 4.2 Certificaciones
     with subtab_cert:
         c1, c2, c3, c4 = st.columns(4)
@@ -1251,7 +1346,7 @@ with tab_fase4:
         c3.metric("Fondo Retención 5%", f"{total_retenciones:,.2f} €")
         c4.metric("Ejecutado sin Certificar", f"{pendiente_certificar:,.2f} €", delta=pendiente_certificar)
         st.divider()
- 
+
         col_cert_form, col_cert_edit = st.columns(2)
         with col_cert_form:
             if est_exp == "En Curso / Activo" and rol == "Arquitecto":
@@ -1270,7 +1365,7 @@ with tab_fase4:
                             cursor.execute("INSERT INTO certificaciones (obra_id, num_certificacion, mes_ano, importe_bruto, retencion_5pct, liquido_pagar, iva_21, total_factura, estado, fecha_aprobacion, observaciones) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, num_c, mes_c, bruto_c, ret_calc, liq_calc, iva_calc, tot_fact, "Aprobada DF (Pendiente Pago)", datetime.now().strftime("%Y-%m-%d"), obs_c))
                             conn.commit()
                             st.rerun()
- 
+
         with col_cert_edit:
             if not df_cert.empty and rol == "Arquitecto":
                 with st.expander("Modificar Estado / Eliminar"):
@@ -1289,10 +1384,10 @@ with tab_fase4:
                             cursor.execute("DELETE FROM certificaciones WHERE id = ?", (id_cert_sel,))
                             conn.commit()
                             st.rerun()
- 
+
         if not df_cert.empty:
             st.dataframe(df_cert[["num_certificacion", "mes_ano", "importe_bruto", "retencion_5pct", "liquido_pagar", "iva_21", "total_factura", "estado", "fecha_aprobacion"]], width="stretch")
- 
+
     # 4.3 Planos CDE
     with subtab_docs:
         col_d1, col_d2 = st.columns([1, 2])
@@ -1317,7 +1412,7 @@ with tab_fase4:
                             cursor.execute("INSERT INTO documentos (obra_id, fecha_entrega, tipo_doc, codigo_plano, revision, destinatario, descripcion, archivo_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, fecha_entrega, tipo_doc, codigo_plano, revision, destinatario, descripcion_doc, ruta_guardada))
                             conn.commit()
                             st.rerun()
- 
+
         with col_d2:
             st.markdown("#### Historial de Planos en Obra")
             if not df_docs.empty and rol == "Arquitecto" and est_exp == "En Curso / Activo":
@@ -1369,7 +1464,7 @@ with tab_fase4:
                                         st.image(bytes_data, use_container_width=True)
             else:
                 st.info("Sin planos registrados.")
- 
+
     # 4.4 Libro de Órdenes
     with subtab_ordenes:
         col_ord1, col_ord2 = st.columns([1, 2])
@@ -1394,7 +1489,7 @@ with tab_fase4:
                             cursor.execute("INSERT INTO incidencias (obra_id, fecha, descripcion, rol_emisor, prioridad, estado, foto_path) VALUES (?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, fecha_hoy, descripcion, rol_emisor, prioridad, "Pendiente", ";".join(rutas_guardadas)))
                             conn.commit()
                             st.rerun()
- 
+
             if not df_inc.empty and est_exp == "En Curso / Activo" and rol == "Arquitecto":
                 st.divider()
                 opciones_inc = {f"ID {row['id']} - {row['descripcion'][:30]}...": row['id'] for _, row in df_inc.iterrows()}
@@ -1410,7 +1505,7 @@ with tab_fase4:
                     cursor.execute("DELETE FROM incidencias WHERE id = ?", (id_inc_sel,))
                     conn.commit()
                     st.rerun()
- 
+
         with col_ord2:
             st.markdown("#### Galería de Bitácora")
             if not df_inc.empty:
@@ -1427,7 +1522,7 @@ with tab_fase4:
                                     with cols_imgs[idx_img % 3]: st.image(p_img, use_container_width=True, caption=f"Foto {idx_img+1}")
             else:
                 st.info("Sin órdenes en bitácora.")
- 
+
 # ---------------------------------------------------------
 # FASE 5: LIQUIDACIÓN, RECEPCIÓN Y POSVENTA
 # ---------------------------------------------------------
@@ -1435,7 +1530,7 @@ with tab_fase5:
     st.markdown("### Fase 5: Cierre de Obra, Liquidación de Retenciones y Posventa")
     row_cierre = df_cierre.iloc[0] if not df_cierre.empty else None
     col_c1, col_c2 = st.columns(2)
- 
+
     with col_c1:
         st.markdown("#### Acta de Recepción y CFO")
         if est_exp == "En Curso / Activo" and rol == "Arquitecto":
@@ -1453,7 +1548,7 @@ with tab_fase5:
                     st.rerun()
         elif row_cierre:
              st.info(f"**Estado de Cierre:** {row_cierre['estado_cierre']} | **Fecha CFO:** {row_cierre['fecha_cfo']} | **Firma Acta:** {row_cierre['fecha_acta_recepcion']}")
- 
+
     with col_c2:
         st.markdown("#### Temporizador de Retención del 5%")
         st.write(f"**Fondo Retenido Acumulado:** `{total_retenciones:,.2f} €`")
@@ -1476,7 +1571,7 @@ with tab_fase5:
                         st.rerun()
         else:
             st.warning("Firma el Acta de Recepción para iniciar el contador de 365 días.")
- 
+
     st.divider()
     col_pv1, col_pv2 = st.columns([1, 2])
     with col_pv1:
@@ -1492,7 +1587,7 @@ with tab_fase5:
                         cursor.execute("INSERT INTO posventa (obra_id, fecha_aviso, elemento_afectado, descripcion, responsable, estado, fecha_resolucion) VALUES (?, ?, ?, ?, ?, ?, ?)", (obra_id_activa, str(f_aviso), elemento, desc_pv, resp_pv, "Pendiente", "-"))
                         conn.commit()
                         st.rerun()
- 
+
     with col_pv2:
         st.markdown("#### Bitácora de Posventa y Garantía")
         if not df_posventa.empty:
